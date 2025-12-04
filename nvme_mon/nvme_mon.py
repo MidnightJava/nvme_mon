@@ -3,12 +3,16 @@ from collections import namedtuple
 from datetime import datetime
 from operator import attrgetter
 from statistics import mean, median
+from collections import defaultdict
 
 LOG_FILE = "/var/log/SSD1_temp.log"
 REC_PATTERN = r"(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s+Sensor (\d)\s(\d+)$"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 Record = namedtuple('LogRecord', ['datetime', 'temp'])
+
+def histo_record():
+    return {"count": 0, "last_date": datetime(1970, 1, 1)}
 
 class NvmeInfo:
 
@@ -20,7 +24,7 @@ class NvmeInfo:
         self.max_temp_date = ""
         self.mean = 0
         self.median = 0
-        self.hisograms = {
+        self.histograms = {
             1: [],
             2: []
         }
@@ -32,7 +36,6 @@ class NvmeInfo:
     @start_date.setter
     def start_date(self, start_date):
         self._start_date = datetime.strptime(start_date, DATE_FORMAT)
-    
     @property
     def num_days(self):
         return (datetime.today() - self.start_date).days
@@ -86,6 +89,20 @@ class NvmeMon:
         max_temp_dates = [datetime.strptime(t.datetime, DATE_FORMAT) for t in all_records if t.temp == max_temp]
         max_temp_date =  sorted(max_temp_dates)[-1]
 
+        s1_histogram = defaultdict(histo_record)
+        for record in self.s1_records:
+            histo_entry = s1_histogram[record.temp]
+            histo_entry["count"] += 1
+            histo_entry["last_date"] = max(datetime.strptime(record.datetime, DATE_FORMAT), histo_entry["last_date"])
+
+        s2_histogram = defaultdict(histo_record)
+        for record in self.s2_records:
+            histo_entry = s2_histogram[record.temp]
+            histo_entry["count"] += 1
+            histo_entry["last_date"] = max(datetime.strptime(record.datetime, DATE_FORMAT), histo_entry["last_date"])
+        
+
+
         info = NvmeInfo()
         info.start_date = start_date
         info.min = min_temp
@@ -93,6 +110,8 @@ class NvmeMon:
         info.max_temp_date = max_temp_date
         info.mean = int(mean_temp)
         info.median = median_temp
+        info.histograms[1] = dict(sorted(s1_histogram.items(), reverse=True))
+        info.histograms[2] = dict(sorted(s2_histogram.items(), reverse=True))
 
         print(f"Start Date: {info.start_date.date()}")
         print(f"Num Days: {info.num_days}")
@@ -101,6 +120,13 @@ class NvmeMon:
         print(f"Max temp datetime: {info.max_temp_date}")
         print(f"Mean temp: {info.mean}")
         print(f"Median temp: {info.median}")
+        print("S1 historgram")
+        for k,v in info.histograms[1].items():
+            print(f"{k}: {v["count"]}  {datetime.strftime(v["last_date"], DATE_FORMAT)}")
+        print()
+        print("S2 historgram")
+        for k,v in info.histograms[2].items():
+            print(f"{k}: {v["count"]}  {datetime.strftime(v["last_date"], DATE_FORMAT)}")
        
 
 if __name__ == '__main__':
