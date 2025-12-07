@@ -38,6 +38,7 @@ class NvmeInfo:
     @start_date.setter
     def start_date(self, start_date):
         self._start_date = datetime.strptime(start_date, DATE_FORMAT)
+        
     @property
     def num_days(self):
         return (datetime.today() - self.start_date).days

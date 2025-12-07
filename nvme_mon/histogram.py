@@ -51,20 +51,6 @@ def render_bar(label, value, last_date, max_value, width):
         bar_text.append(bar, style=color)
         bar_text.append(val_segment)
 
-    #################
-    # bar_text = Text()
-
-    # # Background color = bar color; foreground = default so digits show
-    # val_segment = Text(val_text, style=f"on {color}")
-
-    # # Insert percentage at start of bar
-    # bar_text.append(val_segment)
-
-    # # Append remainder of filled bar
-    # remainder = bar[len(val_text):]
-    # if remainder:
-    #     bar_text.append(Text(remainder, style=color))
-    #######################
     # Label + bar
     line = Text()
     line.append(f"{label:<5} ")
@@ -82,8 +68,6 @@ def print_histogram(
     title="Histogram"
 ):
     console = Console()
-
-    # data = sorted(data, reverse=True)
 
     # Auto terminal width
     term_width = shutil.get_terminal_size((80, 20)).columns
