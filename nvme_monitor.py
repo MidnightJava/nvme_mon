@@ -11,6 +11,8 @@ from statistics import mean
 
 LOG_JSON = "/var/log/nvme_health.json"
 LOG_HUMAN = "/var/log/nvme_health_readable.log"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
 
 
 # -----------------------------
@@ -178,7 +180,7 @@ def extract_health(device, id_ctrl, smart):
         return None
 
     entry = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.strftime(datetime.now(), DATE_FORMAT),
         "device": device,
         "temperature_k": smart.get("temperature"),
         "temperature_c": int(smart.get("temperature") - 273.15) if smart.get("temperature") else None,
