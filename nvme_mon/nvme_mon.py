@@ -138,6 +138,9 @@ class NvmeMon:
             print(f"Median temp: {temp_info.median}")
             print(f"Median sample interval: {temp_info.median_sample_interval} sec")
             device_name = device["temp_info"].device_name
+            key = lambda x: x[1]['count'] #to sort by count
+            key = None #to sort by temp
+            histo = dict(sorted(histo.items(), key=key, reverse=True))
             histogram.print_histogram(histo, max_width=60, box=True, spacing=1, title=f"Temperature Histogram")
 
 if __name__ == '__main__':
