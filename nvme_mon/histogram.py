@@ -67,7 +67,7 @@ def print_histogram(
     spacing=1,
     title="Histogram"
 ):
-    console = Console()
+    console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
 
     # Auto terminal width
     term_width = shutil.get_terminal_size((80, 20)).columns
@@ -101,7 +101,7 @@ def print_temp_info(
     spacing=1,
     title="Histogram"
 ):
-    console = Console()
+    console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
 
     # Auto terminal width
     term_width = shutil.get_terminal_size((80, 20)).columns
@@ -127,7 +127,7 @@ def print_health_info(
     spacing=1,
     title="Histogram"
 ):
-    console = Console()
+    console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
 
     # Auto terminal width
     term_width = shutil.get_terminal_size((80, 20)).columns
