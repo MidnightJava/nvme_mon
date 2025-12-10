@@ -6,7 +6,9 @@ from statistics import mean, median
 from collections import defaultdict
 import histogram
 import json
-import math
+import time
+from pynput.keyboard import Key, Listener
+
 
 LOG_FILE = "/var/log/nvme_health.json"
 REC_PATTERN = r"(\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2})\s+Sensor (\d)\s(\d+)$"
@@ -53,6 +55,7 @@ class NvmeInfo:
 class NvmeMon:
 
     def __init__(self, log_file):
+        self.tab_pressed = False
         self.log_file = log_file
         self.infos = []
         self.last_sample_time = defaultdict(lambda: None)
@@ -118,30 +121,47 @@ class NvmeMon:
         "percentage_used": record.get("percent_used"),
         "health_score": record.get("health_score")
         }
+    
+    def get_devices(self):
+        for _, device in self.devices.items():
+            yield device
+
+    def on_press(self, key):
+        print("TAB PRESSED")
+        if key == Key.tab:
+            self.tab_pressed = True
 
     def display_info(self):
+        listener = Listener(on_press=self.on_press)
+        listener.start()
         print("\033[H\033[2J")
-        for _, device in self.devices.items():
+        for device in self.get_devices():
             temp_info = device["temp_info"]
             health_info = device["health_info"]
-            histo = device["histogram"]
-            print(f"Device: {temp_info.device_name}")
-            print(f"Log Data: {temp_info.num_days} day{'' if temp_info.num_days == 1 else 's'}, beginning {temp_info.start_date.date()}")
-            print("Disk Health Info")
-            for k,v in health_info.items():
-                print(f"{k}: {v}")
-            print("Current Temperature Info (Based on average of all sensor readings)")
-            print(f"Min temp: {temp_info.min}")
-            print(f"Max temp: {temp_info.max}")
-            print(f"Max temp datetime: {temp_info.max_temp_date}")
-            print(f"Mean temp: {temp_info.mean}")
-            print(f"Median temp: {temp_info.median}")
-            print(f"Median sample interval: {temp_info.median_sample_interval} sec")
-            device_name = device["temp_info"].device_name
+            health_info["Device"] = temp_info.device_name
+            health_info["Log Data"] = f"{temp_info.num_days} day{'' if temp_info.num_days == 1 else 's'}, beginning {temp_info.start_date.date()}"
+            data = health_info
+            histogram.print_health_info(data, box=True, title="Disk Health Info")
+
+            
+            data = {
+                "Min temp": temp_info.min,
+                "Max temp": temp_info.max,
+                "Max temp datetime": temp_info.max_temp_date,
+                "Mean temp": temp_info.mean,
+                "Median temp": temp_info.median,
+                "Median sample interval": f"{temp_info.median_sample_interval} sec"
+            }
+            histogram.print_temp_info(data, box=True, title="Current Temperature Info (Based on average of all sensor readings)")
+
             key = lambda x: x[1]['count'] #to sort by count
             key = None #to sort by temp
+            histo = device["histogram"]
             histo = dict(sorted(histo.items(), key=key, reverse=True))
             histogram.print_histogram(histo, max_width=60, box=True, spacing=1, title=f"Temperature Histogram")
+            while not self.tab_pressed:
+                    time.sleep(0.5)
+            print("DONE")
 
 if __name__ == '__main__':
     mon = NvmeMon(LOG_FILE)

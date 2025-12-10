@@ -93,16 +93,69 @@ def print_histogram(
         for l in lines:
             console.print(l)
 
+def print_temp_info(
+    data,
+    *,
+    max_width=50,
+    box=True,
+    spacing=1,
+    title="Histogram"
+):
+    console = Console()
+
+    # Auto terminal width
+    term_width = shutil.get_terminal_size((80, 20)).columns
+    width = min(max_width, term_width - 20)
+
+    lines = []
+    for k,v in data.items():
+        lines.append(Text(f"{k}: {v}"))
+    lines.append(Text(""))
+
+     # Put inside box or print raw
+    if box:
+        console.print(Panel(Text("\n").join(lines), title=title))
+    else:
+        for l in lines:
+            console.print(l)
+
+def print_health_info(
+    data,
+    *,
+    max_width=50,
+    box=True,
+    spacing=1,
+    title="Histogram"
+):
+    console = Console()
+
+    # Auto terminal width
+    term_width = shutil.get_terminal_size((80, 20)).columns
+    width = min(max_width, term_width - 20)
+
+    lines = []
+    for k,v in data.items():
+        lines.append(Text(f"{k}: {v}"))
+    
+     # Put inside box or print raw
+    if box:
+        console.print(Panel(Text("\n").join(lines), title=title))
+    else:
+        for l in lines:
+            console.print(l)
+
+
+
 
 # ----------------- Example -----------------
 if __name__ == "__main__":
-    histogram_data = [
-        ("Apples", 12),
-        ("Bananas", 6),
-        ("Cherries", 18),
-        ("Dates", 9),
-        ("Elder", 3),
-    ]
+    histogram_data = dict([
+        (90, {"count":12, "last_date": datetime.today()}),
+        (37, {"count": 6, "last_date": datetime.today()}),
+        (53, {"count": 18, "last_date": datetime.today()}),
+        (70, {"count": 9, "last_date": datetime.today()}),
+        (65, {"count": 3, "last_date": datetime.today()}),
+    ])
 
     print_histogram(
         histogram_data,
