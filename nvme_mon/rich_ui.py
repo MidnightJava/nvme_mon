@@ -16,7 +16,7 @@ DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 def bar_color_for_value(temp):
     if temp < 50:
         return "green"
-    elif temp < 65:
+    elif temp < 70:
         return "yellow"
     else:
         return "red"
