@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-import re
+import os, sys, tty, termios
 from collections import namedtuple, defaultdict
 from datetime import datetime
 from operator import attrgetter
 from statistics import mean, median
-import histogram
+import rich_ui
 import json
+from itertools import cycle
 import time
-import threading
-from pynput.keyboard import Key, Listener
 
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -20,6 +19,33 @@ def histo_record():
 
 def device_record():
     return {"histogram": defaultdict(histo_record), "temp_info": {}, "health_info": {}}
+
+def clear_screen():
+     print("\033[H\033[2J")
+
+def getkey():
+    old_settings = termios.tcgetattr(sys.stdin)
+    tty.setcbreak(sys.stdin.fileno())
+    try:
+        b = os.read(sys.stdin.fileno(), 3).decode()
+        if len(b) == 3:
+            k = ord(b[2])
+        else:
+            k = ord(b)
+        key_mapping = {
+            127: 'backspace',
+            10: 'return',
+            32: 'space',
+            9: 'tab',
+            27: 'esc',
+            65: 'up',
+            66: 'down',
+            67: 'right',
+            68: 'left'
+        }
+        return key_mapping.get(k, chr(k))
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
 class NvmeInfo:
     def __init__(self):
@@ -48,13 +74,22 @@ class NvmeInfo:
 
 
 class NvmeMon:
+    global CURRENT_SORT_KEY_IDX
+    global SORT_KEYS
     def __init__(self, log_file):
         # set up attributes early
         self.log_file = log_file
-        self.tab_event = threading.Event()      # use Event instead of boolean
         self.infos = []
         self.last_sample_time = defaultdict(lambda: None)
         self.sample_intervals = defaultdict(list)
+        self.SORT_KEYS = [
+            {"name": "Temperature", "value" :None}, #sort by temp
+            {"name": "Last Occurrence", "value": lambda x: x[1]['last_date']}, #sort by last high temp date
+            {"name": "Count", "value": lambda x: x[1]['count']} #sort by count
+        ]
+        self.dt_display = 'date'
+        self.CURRENT_SORT_KEY_IDX = 0
+        self.top_five=True
 
         self.parse_log_file()
         # start display (which also starts the listener)
@@ -112,71 +147,67 @@ class NvmeMon:
         }
 
     def get_devices(self):
-        for _, device in self.devices.items():
+        for _, device in cycle(self.devices.items()):
             yield device
 
-    # callback from pynput
-    def on_press(self, key):
-        print(f"on_press callback: {key!r}")
-        print("Raw key event:", repr(key), type(key))
-
-        # Case 1: tab reported as Key.tab
-        if key == Key.tab:
-            self.tab_event.set()
-            return
-
-        # Case 2: tab reported as a char ('\t')
-        try:
-            if hasattr(key, 'char') and key.char == '\t':
-                self.tab_event.set()
-                return
-        except:
-            pass
-
-
     def display_info(self):
-        # start listener thread BEFORE we enter device-processing loop
-        listener = Listener(on_press=self.on_press)
-        listener.start()
-        print("\033[H\033[2J")
 
-        try:
-            for device in self.get_devices():
-                temp_info = device["temp_info"]
-                health_info = device["health_info"]
-                health_info["Device"] = temp_info.device_name
-                health_info["Log Data"] = f"{temp_info.num_days} day{'' if temp_info.num_days == 1 else 's'}, beginning {temp_info.start_date.date()}"
-                data = health_info
-                histogram.print_health_info(data, box=True, title="Disk Health Info")
+        current_device = None
+        for device in self.get_devices():
+            clear_screen()
+            if current_device is not None and device != current_device:
+                continue
+            current_device = None
+            temp_info = device["temp_info"]
+            health_info = device["health_info"]
+            health_info["Device"] = os.path.basename(temp_info.device_name)
+            health_info["Log Data"] = f"{temp_info.num_days} day{'' if temp_info.num_days == 1 else 's'}, beginning {temp_info.start_date.date()}"
+            data = health_info
+            rich_ui.print_health_info(data, box=True, title="Disk Health Info")
 
-                data = {
-                    "Min temp": temp_info.min,
-                    "Max temp": temp_info.max,
-                    "Max temp datetime": temp_info.max_temp_date,
-                    "Mean temp": temp_info.mean,
-                    "Median temp": temp_info.median,
-                    "Median sample interval": f"{temp_info.median_sample_interval} sec"
-                }
-                histogram.print_temp_info(data, box=True, title="Current Temperature Info (Based on average of all sensor readings)")
+            data = {
+                "Min temp": temp_info.min,
+                "Max temp": temp_info.max,
+                "Max temp datetime": temp_info.max_temp_date,
+                "Mean temp": temp_info.mean,
+                "Median temp": temp_info.median,
+                "Median sample interval": f"{temp_info.median_sample_interval} sec"
+            }
+            rich_ui.print_temp_info(data, box=True, title="Summary Temperature Info (Based on average of all sensor readings)")
 
-                histo = device["histogram"]
-                histo = dict(sorted(histo.items(), key=None, reverse=True))
-                histogram.print_histogram(histo, max_width=60, box=True, spacing=1, title=f"Temperature Histogram")
+            histo = device["histogram"]
+            histo = dict(sorted(histo.items(), key=self.SORT_KEYS[self.CURRENT_SORT_KEY_IDX]["value"], reverse=True))
+            if self.top_five:
+                histo = dict(list(histo.items())[:5])
+            rich_ui.print_histogram(
+                histo,
+                dt_display=self.dt_display,
+                max_width=60,
+                sort_key=self.SORT_KEYS[self.CURRENT_SORT_KEY_IDX]["name"],
+                box=True,
+                spacing=1, title=f"Temperature Histogram")
 
-                # Wait until Tab is pressed. Blocks here (no busy-wait).
-                print("Press TAB to continue to the next device...")
-                self.tab_event.wait()        # blocks until .set() called in callback
-                print("Continuing after TAB")
-                # reset for next device
-                self.tab_event.clear()
-
-        finally:
-            # ensure we stop the listener when done (or on exception)
-            listener.stop()
-
+            # Wait until Tab is pressed. Blocks here (no busy-wait).
+            print("Press Tab to cycle through the devices, s to rotate histogram sort key, t to toggle between date and date-time, r to toggle top or all results, q to quit, ")
+            
+            key = getkey()
+            if key == 'q':
+                sys.exit(0)
+            elif key == 's':
+                self.CURRENT_SORT_KEY_IDX = (self.CURRENT_SORT_KEY_IDX + 1) % len(self.SORT_KEYS)
+                current_device = device
+                continue
+            elif key == 'r':
+                self.top_five = False if self.top_five else True
+                current_device = device
+                continue
+            elif key == 't':
+                self.dt_display = 'datetime' if self.dt_display == 'date' else 'date'
+                current_device = device
+                continue
+            while key != 'tab':
+                key = getkey()
+                time.sleep(0.5)
 
 if __name__ == '__main__':
-    import os
-    print("Running as UID:", os.getuid())
-
     mon = NvmeMon(LOG_FILE)

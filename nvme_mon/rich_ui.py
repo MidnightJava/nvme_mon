@@ -3,11 +3,14 @@ from rich.panel import Panel
 from rich.text import Text
 import shutil
 from datetime import datetime
+import curses
+import os
 
 # Smooth block sequence (full + fractions)
 FULL = "█"
 FRACTIONS = ["", "▏", "▎", "▍", "▌", "▋", "▊", "▉"]
 DATE_FORMAT = "%Y-%m-%d"
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # Threshold coloring (percent)
 def bar_color_for_value(temp):
@@ -19,7 +22,7 @@ def bar_color_for_value(temp):
         return "red"
 
 
-def render_bar(label, value, last_date, max_value, width):
+def render_bar(label, value, last_date, dt_display, max_value, width):
     pct = value / max_value if max_value else 0
     val_text = f"{value:3.0f}"
 
@@ -55,13 +58,18 @@ def render_bar(label, value, last_date, max_value, width):
     line = Text()
     line.append(f"{label:<5} ")
     line.append(bar_text)
-    line.append(f"   {datetime.strftime(last_date.date(), DATE_FORMAT)}", style="gray50")
+    if dt_display == "date":
+        line.append(f"   {datetime.strftime(last_date, DATE_FORMAT)}", style="gray50")
+    else:
+        line.append(f"   {datetime.strftime(last_date, DATETIME_FORMAT)}", style="gray50")
     return line
 
 
 def print_histogram(
     data,
     *,
+    dt_display="date",
+    sort_key="Temperature",
     max_width=50,
     box=True,
     spacing=1,
@@ -76,11 +84,11 @@ def print_histogram(
     max_value = max(v["count"] for _, v in data.items())
 
     lines = []
-    lines.append(Text("Temp | Count | Last Occurrence", style="bright_green"))
+    lines.append(Text("Temp | Count | Last Occurrence  (Sorting by ", style="bright_green") + Text(f"{sort_key})", style="bright_red"))
     lines.append(Text(""))
 
     for label, value in data.items():
-        line = render_bar(label, value["count"], value["last_date"],  max_value, width)
+        line = render_bar(label, value["count"], value["last_date"],  dt_display, max_value, width)
         lines.append(line)
         # vertical spacing (empty lines)
         for _ in range(spacing):
@@ -92,6 +100,7 @@ def print_histogram(
     else:
         for l in lines:
             console.print(l)
+    console.clear_live
 
 def print_temp_info(
     data,
@@ -119,6 +128,8 @@ def print_temp_info(
         for l in lines:
             console.print(l)
 
+    console.clear_live
+
 def print_health_info(
     data,
     *,
@@ -135,7 +146,10 @@ def print_health_info(
 
     lines = []
     for k,v in data.items():
-        lines.append(Text(f"{k}: {v}"))
+        if isinstance(k, str) and k == "Device":
+            lines[0]= Text(f"{k}: ") + Text(f"{v}", style="bold blue on white")
+        else:
+            lines.append(Text(f"{k}: {v}"))
     
      # Put inside box or print raw
     if box:
@@ -143,6 +157,8 @@ def print_health_info(
     else:
         for l in lines:
             console.print(l)
+
+    console.clear_live
 
 
 
