@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, tty, termios
+import os, sys, tty, termios, select
 from collections import namedtuple, defaultdict
 from datetime import datetime
 from operator import attrgetter
@@ -12,6 +12,8 @@ import time
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+REFRESH_INTERVAL_SEC = 60
+
 Record = namedtuple('LogRecord', ['datetime', 'temp'])
 
 def histo_record():
@@ -23,10 +25,14 @@ def device_record():
 def clear_screen():
      print("\033[H\033[2J")
 
-def getkey():
+def getkey(timeout=5):
     old_settings = termios.tcgetattr(sys.stdin)
     tty.setcbreak(sys.stdin.fileno())
     try:
+        # Wait until stdin is readable, up to `timeout` seconds
+        r, _, _ = select.select([sys.stdin], [], [], timeout)
+        if not r:
+            return None  # <--- Timeout
         b = os.read(sys.stdin.fileno(), 3).decode()
         if len(b) == 3:
             k = ord(b[2])
@@ -89,7 +95,13 @@ class NvmeMon:
         ]
         self.dt_display = 'date'
         self.CURRENT_SORT_KEY_IDX = 0
-        self.top_five=True
+        self.results_scope = [
+            "top_5",
+            "all",
+            "yellow",
+            "red",
+        ]
+        self.results_scope_idx = 0
 
         self.parse_log_file()
         # start display (which also starts the listener)
@@ -153,6 +165,7 @@ class NvmeMon:
     def display_info(self):
 
         current_device = None
+        prev_key = None
         for device in self.get_devices():
             clear_screen()
             if current_device is not None and device != current_device:
@@ -177,20 +190,25 @@ class NvmeMon:
 
             histo = device["histogram"]
             histo = dict(sorted(histo.items(), key=self.SORT_KEYS[self.CURRENT_SORT_KEY_IDX]["value"], reverse=True))
-            if self.top_five:
+            if self.results_scope[self.results_scope_idx] == "top_5":
                 histo = dict(list(histo.items())[:5])
+            elif self.results_scope[self.results_scope_idx] == "yellow":
+                histo = {k: v for k, v in histo.items() if k >= 60}
+            elif self.results_scope[self.results_scope_idx] == "red":
+                histo = {k: v for k, v in histo.items() if k >= 70}
             rich_ui.print_histogram(
                 histo,
                 dt_display=self.dt_display,
                 max_width=60,
                 sort_key=self.SORT_KEYS[self.CURRENT_SORT_KEY_IDX]["name"],
+                results_scope=self.results_scope[self.results_scope_idx],
                 box=True,
                 spacing=1, title=f"Temperature Histogram")
 
             # Wait until Tab is pressed. Blocks here (no busy-wait).
-            print("Press Tab to cycle through the devices, s to rotate histogram sort key, t to toggle between date and date-time, r to toggle top or all results, q to quit, ")
+            print("Press a key to change display: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
             
-            key = getkey()
+            if prev_key is None: key = getkey()
             if key == 'q':
                 sys.exit(0)
             elif key == 's':
@@ -198,16 +216,22 @@ class NvmeMon:
                 current_device = device
                 continue
             elif key == 'r':
-                self.top_five = False if self.top_five else True
+                self.results_scope_idx = (self.results_scope_idx + 1) % len(self.results_scope)
                 current_device = device
                 continue
             elif key == 't':
                 self.dt_display = 'datetime' if self.dt_display == 'date' else 'date'
                 current_device = device
                 continue
-            while key != 'tab':
-                key = getkey()
+            elif key == 'tab':
+                continue
+            start_time = time.time()
+            while key is None and time.time() - start_time < REFRESH_INTERVAL_SEC:
+                key = getkey(5)
                 time.sleep(0.5)
+            prev_key = key
+            if time.time() - start_time >= REFRESH_INTERVAL_SEC or key != 'tab':
+                current_device = device
 
 if __name__ == '__main__':
     mon = NvmeMon(LOG_FILE)

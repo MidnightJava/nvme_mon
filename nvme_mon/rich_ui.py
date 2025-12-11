@@ -11,6 +11,14 @@ FULL = "█"
 FRACTIONS = ["", "▏", "▎", "▍", "▌", "▋", "▊", "▉"]
 DATE_FORMAT = "%Y-%m-%d"
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+TIME_FORMAT = "%H:%M:%S"
+
+RESULTS_SCOPE_MAP = {
+    "top_5": {"text": "Top 5", "style": "bright_blue"},
+    "all": {"text": "All", "style": "bright_blue"},
+    "yellow": {"text": "Temp >= 60", "style": "bright_yellow"},
+    "red": {"text": "Temp >= 70", "style": "bright_red"},
+}
 
 # Threshold coloring (percent)
 def bar_color_for_value(temp):
@@ -20,6 +28,16 @@ def bar_color_for_value(temp):
         return "yellow"
     else:
         return "red"
+    
+def render_top_line_text(sort_key):
+    return (Text("Temp | Count | Last Occurrence  (Sorting by ", style="bright_green") +
+        Text(f"{sort_key})", style="bright_red") +
+        Text(f"   Last updated: {datetime.now().strftime(TIME_FORMAT)}", style="gray50"))
+
+def render_resulots_text(results_scope):
+    return (Text("Showing ") +
+        Text(f"{RESULTS_SCOPE_MAP[results_scope]["text"]}", style=f"{RESULTS_SCOPE_MAP[results_scope]["style"]}") +
+        Text(" Results"))
 
 
 def render_bar(label, value, last_date, dt_display, max_value, width):
@@ -70,6 +88,7 @@ def print_histogram(
     *,
     dt_display="date",
     sort_key="Temperature",
+    results_scope="top_5",
     max_width=50,
     box=True,
     spacing=1,
@@ -81,10 +100,12 @@ def print_histogram(
     term_width = shutil.get_terminal_size((80, 20)).columns
     width = min(max_width, term_width - 20)
 
-    max_value = max(v["count"] for _, v in data.items())
+    max_value = max(v["count"] for _, v in data.items()) if len(data.items()) else 0
 
     lines = []
-    lines.append(Text("Temp | Count | Last Occurrence  (Sorting by ", style="bright_green") + Text(f"{sort_key})", style="bright_red"))
+    lines.append(render_top_line_text(sort_key))
+    lines.append(Text(""))
+    lines.append(render_resulots_text(results_scope))
     lines.append(Text(""))
 
     for label, value in data.items():
