@@ -34,16 +34,37 @@ def bar_color_for_value(temp):
     else:
         return "red"
     
-def render_top_line_text(sort_key):
-    return (Text("Temp | Count | Last Occurrence  (Sorting by ", style="bright_green") +
-        Text(f"{sort_key})", style="bright_red") +
-        Text(f"   Last updated: {datetime.now().strftime(TIME_FORMAT)}", style="gray50"))
+def render_top_line_text(sort_key, width):
+    text = [
+        "Temp | Count | Last Occurrence  (Sorting by ",
+        f"{sort_key})",
+        f"Last updated: {datetime.now().strftime(TIME_FORMAT)}"
+    ]
+    l1 = sum([len(t) for t in text[:2]])
+    remainder = width - l1
+    text[2] = " " * (remainder) + text[2]
+    styles = [
+        "bright_green",
+        "bright_red",
+        "gray50"
+    ]
+    return Text.assemble(
+        (text[0], styles[0]),
+        (text[1], styles[1]),
+        (text[2], styles[2])
+    )
 
-def render_resulots_text(results_scope):
+def render_results_text(results_scope):
     return (Text("Showing ") +
         Text(f"{RESULTS_SCOPE_MAP[results_scope]["text"]}", style=f"{RESULTS_SCOPE_MAP[results_scope]["style"]}") +
         Text(" Results"))
 
+def render_prompt_text(prompt):
+    text = Text(prompt)
+    text.highlight_regex('tab:|s:|r:|t:|q:', "green")
+    text.highlight_regex(':', "white")
+    console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
+    console.print(text)
 
 def render_bar(label, value, last_date, dt_display, max_value, width):
     pct = value / max_value if max_value else 0
@@ -64,7 +85,7 @@ def render_bar(label, value, last_date, dt_display, max_value, width):
         left_padding = (len(bar) - len(val_text)) // 2
         right_padding = len(bar) - len(val_text) - left_padding
         bar_text.append(bar[:right_padding], style=color)
-        val_segment = Text(val_text, style=f"bold black on {color}")
+        val_segment = Text(val_text, style=f"bold white on {color}")
         bar_text.append(val_segment)
         bar_text.append(bar[left_padding:], style=color)
     else:        
@@ -98,15 +119,15 @@ def print_histogram(
     console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
 
     # Auto terminal width
-    term_width = shutil.get_terminal_size((80, 20)).columns
-    width = min(max_width, term_width - 20)
+    term_width = shutil.get_terminal_size((120, 40)).columns
+    width = min(max_width, term_width)
 
     max_value = max(v["count"] for _, v in data.items()) if len(data.items()) else 0
 
     lines = []
-    lines.append(render_top_line_text(sort_key))
+    lines.append(render_top_line_text(sort_key, width))
     lines.append(Text(""))
-    lines.append(render_resulots_text(results_scope))
+    lines.append(render_results_text(results_scope))
     lines.append(Text(""))
 
     for label, value in data.items():
@@ -157,7 +178,7 @@ def print_disk_info(
 
     lines = []
     for k,v in data.items():
-        text = Text(f"{k}: ") + Text(f"{v}", Style(color = Color.from_triplet(parse_rgb_hex("F5A818"))))
+        text = Text(f"{k}: ") + Text(f"{v}", style="green")
         text.align('left', width // num_cols, ' ')
         lines.append(text)
 

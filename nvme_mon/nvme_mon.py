@@ -208,16 +208,16 @@ class NvmeMon:
             rich_ui.print_histogram(
                 histo,
                 dt_display=self.dt_display,
-                max_width=60,
+                max_width=120,
                 sort_key=self.SORT_KEYS[self.CURRENT_SORT_KEY_IDX]["name"],
                 results_scope=self.results_scope[self.results_scope_idx],
                 box=True,
                 spacing=1, title=f"Temperature Histogram")
 
             # Wait until Tab is pressed. Blocks here (no busy-wait).
-            print("Press a key to change display: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
+            rich_ui.render_prompt_text("Press a key to change display: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
             
-            if prev_key is None: key = getkey(True)
+            key = getkey(prev_key is None)
             if key == 'q':
                 sys.exit(0)
             elif key == 's':
@@ -246,7 +246,7 @@ class NvmeMon:
                 sys.exit(0)
             prev_key = key
             if time.time() - start_time >= REFRESH_INTERVAL_SEC or key != 'tab':
-                prev_key = None
+                # prev_key = None
                 current_device = device
 
 if __name__ == '__main__':
