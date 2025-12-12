@@ -9,6 +9,8 @@ import json
 from itertools import cycle
 import time
 
+from rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD
+
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -25,14 +27,15 @@ def device_record():
 def clear_screen():
      print("\033[H\033[2J")
 
-def getkey(timeout=5):
+def getkey(block=False, timeout=5):
     old_settings = termios.tcgetattr(sys.stdin)
     tty.setcbreak(sys.stdin.fileno())
     try:
-        # Wait until stdin is readable, up to `timeout` seconds
-        r, _, _ = select.select([sys.stdin], [], [], timeout)
-        if not r:
-            return None  # <--- Timeout
+        if block:
+            # Wait until stdin is readable, up to `timeout` seconds
+            r, _, _ = select.select([sys.stdin], [], [], timeout)
+            if not r:
+                return None  # <--- Timeout
         b = os.read(sys.stdin.fileno(), 3).decode()
         if len(b) == 3:
             k = ord(b[2])
@@ -171,12 +174,18 @@ class NvmeMon:
             if current_device is not None and device != current_device:
                 continue
             current_device = None
+
             temp_info = device["temp_info"]
+
+            data = {
+                "Device": os.path.basename(temp_info.device_name),
+                "Log Data":  f"{temp_info.num_days} day{'' if temp_info.num_days == 1 else 's'}, beginning {temp_info.start_date.date()}"
+            }
+            rich_ui.print_general_info(data)
+
             health_info = device["health_info"]
-            health_info["Device"] = os.path.basename(temp_info.device_name)
-            health_info["Log Data"] = f"{temp_info.num_days} day{'' if temp_info.num_days == 1 else 's'}, beginning {temp_info.start_date.date()}"
             data = health_info
-            rich_ui.print_health_info(data, box=True, title="Disk Health Info")
+            rich_ui.print_disk_info(data, box=True, title="Disk Health Info")
 
             data = {
                 "Min temp": temp_info.min,
@@ -186,16 +195,16 @@ class NvmeMon:
                 "Median temp": temp_info.median,
                 "Median sample interval": f"{temp_info.median_sample_interval} sec"
             }
-            rich_ui.print_temp_info(data, box=True, title="Summary Temperature Info (Based on average of all sensor readings)")
+            rich_ui.print_disk_info(data, box=True, title="Summary Temperature Info (Based on average of all sensor readings)")
 
             histo = device["histogram"]
             histo = dict(sorted(histo.items(), key=self.SORT_KEYS[self.CURRENT_SORT_KEY_IDX]["value"], reverse=True))
             if self.results_scope[self.results_scope_idx] == "top_5":
                 histo = dict(list(histo.items())[:5])
             elif self.results_scope[self.results_scope_idx] == "yellow":
-                histo = {k: v for k, v in histo.items() if k >= 60}
+                histo = {k: v for k, v in histo.items() if k >= YELLOW_THRESHOLD}
             elif self.results_scope[self.results_scope_idx] == "red":
-                histo = {k: v for k, v in histo.items() if k >= 70}
+                histo = {k: v for k, v in histo.items() if k >= RED_THRESHOLD}
             rich_ui.print_histogram(
                 histo,
                 dt_display=self.dt_display,
@@ -208,29 +217,36 @@ class NvmeMon:
             # Wait until Tab is pressed. Blocks here (no busy-wait).
             print("Press a key to change display: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
             
-            if prev_key is None: key = getkey()
+            if prev_key is None: key = getkey(True)
             if key == 'q':
                 sys.exit(0)
             elif key == 's':
                 self.CURRENT_SORT_KEY_IDX = (self.CURRENT_SORT_KEY_IDX + 1) % len(self.SORT_KEYS)
+                prev_key = None
                 current_device = device
                 continue
             elif key == 'r':
                 self.results_scope_idx = (self.results_scope_idx + 1) % len(self.results_scope)
+                prev_key = None
                 current_device = device
                 continue
             elif key == 't':
                 self.dt_display = 'datetime' if self.dt_display == 'date' else 'date'
+                prev_key = None
                 current_device = device
                 continue
             elif key == 'tab':
+                prev_key = None
                 continue
             start_time = time.time()
             while key is None and time.time() - start_time < REFRESH_INTERVAL_SEC:
-                key = getkey(5)
+                key = getkey()
                 time.sleep(0.5)
+            if key == 'q':
+                sys.exit(0)
             prev_key = key
             if time.time() - start_time >= REFRESH_INTERVAL_SEC or key != 'tab':
+                prev_key = None
                 current_device = device
 
 if __name__ == '__main__':

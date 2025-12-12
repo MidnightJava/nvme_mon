@@ -1,6 +1,8 @@
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+from rich.color import Color, parse_rgb_hex
+from rich.style import Style
 import shutil
 from datetime import datetime
 import curses
@@ -13,18 +15,21 @@ DATE_FORMAT = "%Y-%m-%d"
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 TIME_FORMAT = "%H:%M:%S"
 
+YELLOW_THRESHOLD = 60
+RED_THRESHOLD = 70
+
 RESULTS_SCOPE_MAP = {
     "top_5": {"text": "Top 5", "style": "bright_blue"},
     "all": {"text": "All", "style": "bright_blue"},
-    "yellow": {"text": "Temp >= 60", "style": "bright_yellow"},
-    "red": {"text": "Temp >= 70", "style": "bright_red"},
+    "yellow": {"text": f"Temp >= {YELLOW_THRESHOLD}", "style": "yellow"},
+    "red": {"text": f"Temp >= {RED_THRESHOLD}", "style": "bright_red"},
 }
 
 # Threshold coloring (percent)
 def bar_color_for_value(temp):
-    if temp < 50:
+    if temp < YELLOW_THRESHOLD:
         return "green"
-    elif temp < 70:
+    elif temp < RED_THRESHOLD:
         return "yellow"
     else:
         return "red"
@@ -54,10 +59,6 @@ def render_bar(label, value, last_date, dt_display, max_value, width):
 
     bar = FULL * full + (FRACTIONS[frac] if frac > 0 else "")
 
-    # Embed percentage text INSIDE the bar
-    # To do this: replace beginning of bar text with percentage string
-    # but color its background to match bar color
-    # Pad/center the percentage in the bar
     bar_text = Text()
     if len(bar) >= len(val_text):
         left_padding = (len(bar) - len(val_text)) // 2
@@ -67,7 +68,7 @@ def render_bar(label, value, last_date, dt_display, max_value, width):
         bar_text.append(val_segment)
         bar_text.append(bar[left_padding:], style=color)
     else:        
-        # Bar too short: show percentage after bar
+        # Bar too short: show value after bar
         val_segment = Text(val_text)
         bar_text.append(bar, style=color)
         bar_text.append(val_segment)
@@ -89,7 +90,7 @@ def print_histogram(
     dt_display="date",
     sort_key="Temperature",
     results_scope="top_5",
-    max_width=50,
+    max_width=170,
     box=True,
     spacing=1,
     title="Histogram"
@@ -123,12 +124,21 @@ def print_histogram(
             console.print(l)
     console.clear_live
 
-def print_temp_info(
+def print_general_info(
     data,
     *,
-    max_width=50,
+    max_width=80
+):
+    console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=True)
+
+    line = Text(f"Device: ") + Text(data["Device"], style="bold blue on white") + Text(f"    Log Info: {data["Log Data"]}")
+    console.print(Panel(line))
+
+def print_disk_info(
+    data,
+    *,
+    max_width=200,
     box=True,
-    spacing=1,
     title="Histogram"
 ):
     console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
@@ -137,51 +147,47 @@ def print_temp_info(
     term_width = shutil.get_terminal_size((80, 20)).columns
     width = min(max_width, term_width - 20)
 
-    lines = []
-    for k,v in data.items():
-        lines.append(Text(f"{k}: {v}"))
-    lines.append(Text(""))
-
-     # Put inside box or print raw
-    if box:
-        console.print(Panel(Text("\n").join(lines), title=title))
+    max_item_width = max([len(k) + len(str(v)) for k,v in data.items()])
+    if width >= (max_item_width * 3):
+        num_cols = 3
+    elif width >= (max_item_width * 2):
+        num_cols = 2
     else:
-        for l in lines:
-            console.print(l)
-
-    console.clear_live
-
-def print_health_info(
-    data,
-    *,
-    max_width=50,
-    box=True,
-    spacing=1,
-    title="Histogram"
-):
-    console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
-
-    # Auto terminal width
-    term_width = shutil.get_terminal_size((80, 20)).columns
-    width = min(max_width, term_width - 20)
+        num_cols = 1
 
     lines = []
     for k,v in data.items():
-        if isinstance(k, str) and k == "Device":
-            lines[0]= Text(f"{k}: ") + Text(f"{v}", style="bold blue on white")
-        else:
-            lines.append(Text(f"{k}: {v}"))
+        text = Text(f"{k}: ") + Text(f"{v}", Style(color = Color.from_triplet(parse_rgb_hex("F5A818"))))
+        text.align('left', width // num_cols, ' ')
+        lines.append(text)
+
+    
+    new_lines = [Text("")]
+    if num_cols == 3:
+        for i in range(0, len(lines), 3):
+            if i + 2 < len(lines):
+                new_lines.append(lines[i] + lines[i+1] + lines[i+2])
+            elif i + 1 < len(lines):
+                new_lines.append(lines[i] + lines[i+1])
+            else:
+                new_lines.append(lines[i])
+    elif num_cols == 2:
+        for i in range(0, len(lines), 2):
+            if i + 1 < len(lines):
+                new_lines.append(lines[i] + lines[i+1])
+            else:
+                new_lines.append(lines[i])
+    else:
+        new_lines = lines
+
+    new_lines.append(Text(""))
     
      # Put inside box or print raw
     if box:
-        console.print(Panel(Text("\n").join(lines), title=title))
+        console.print(Panel(Text("\n").join(new_lines), title=title))
     else:
-        for l in lines:
+        for l in new_lines:
             console.print(l)
-
-    console.clear_live
-
-
 
 
 # ----------------- Example -----------------
