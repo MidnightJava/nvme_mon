@@ -64,7 +64,7 @@ def render_bar(label, value, last_date, dt_display, max_value, width):
         left_padding = (len(bar) - len(val_text)) // 2
         right_padding = len(bar) - len(val_text) - left_padding
         bar_text.append(bar[:right_padding], style=color)
-        val_segment = Text(val_text, style=f"bright_white on {color}")
+        val_segment = Text(val_text, style=f"bold black on {color}")
         bar_text.append(val_segment)
         bar_text.append(bar[left_padding:], style=color)
     else:        
