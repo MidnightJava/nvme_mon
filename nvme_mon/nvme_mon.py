@@ -67,7 +67,8 @@ class NvmeInfo:
         self.mean = 0
         self.median = 0
         self.histograms = {1: [], 2: []}
-        self.median_sample_interval = 0
+        self.median_sample_interval = None
+        self.current_sample_interval = None
 
     @property
     def start_date(self):
@@ -138,6 +139,7 @@ class NvmeMon:
         max_temp_dates = [datetime.strptime(t.datetime, DATE_FORMAT) for t in temp_records if int(t.temp) == max_temp]
         max_temp_date = sorted(max_temp_dates)[-1]
         median_sample_delta = median(self.sample_intervals[device]) if self.sample_intervals[device] else 0
+        current_sample_delta = median(self.sample_intervals[device][:10]) if self.sample_intervals[device] else 0
 
         info = NvmeInfo()
         info.device_name = device
@@ -148,6 +150,7 @@ class NvmeMon:
         info.mean = int(mean_temp)
         info.median = int(median_temp)
         info.median_sample_interval = int(median_sample_delta)
+        info.current_sample_interval = int(current_sample_delta)
 
         return info
 
@@ -157,7 +160,7 @@ class NvmeMon:
             "unsafe_shutdowns": record.get("unsafe_shutdowns"),
             "media_errors": record.get("media_errors"),
             "num_err_log_entries": record.get("num_err_log_entries"),
-            "percentage_used": record.get("percent_used"),
+            "percentage_used": record.get("percentage_used"),
             "health_score": record.get("health_score")
         }
 
@@ -193,7 +196,7 @@ class NvmeMon:
                 "Max temp datetime": temp_info.max_temp_date,
                 "Mean temp": temp_info.mean,
                 "Median temp": temp_info.median,
-                "Median sample interval": f"{temp_info.median_sample_interval} sec"
+                "Sample interval (current/median)": f"{temp_info.current_sample_interval}/{temp_info.median_sample_interval} sec"
             }
             rich_ui.print_disk_info(data, box=True, title="Summary Temperature Info (Based on average of all sensor readings)")
 

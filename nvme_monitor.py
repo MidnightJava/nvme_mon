@@ -215,7 +215,7 @@ def extract_health(device, id_ctrl, smart):
 # -----------------------------
 # Monitoring Loop
 # -----------------------------
-def monitor(interval=60):
+def monitor(interval=60*5):
     root_logger.info("NVMe monitoring daemon starting...")
 
     while True:
