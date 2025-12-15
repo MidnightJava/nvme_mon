@@ -77,13 +77,14 @@ def render_bar(label, value, last_date, dt_display, max_value, width):
     total_blocks = max(0.2, pct * width)
     full = int(total_blocks)
     frac = int((total_blocks - full) * 8)
+    print(f"Width: {width},  Bocks: {full} ")
 
     bar = FULL * full + (FRACTIONS[frac] if frac > 0 else "")
 
     bar_text = Text()
     if len(bar) >= len(val_text):
         left_padding = (len(bar) - len(val_text)) // 2
-        right_padding = len(bar) - len(val_text) - left_padding
+        right_padding = (len(bar) - len(val_text)) - left_padding
         bar_text.append(bar[:right_padding], style=color)
         val_segment = Text(val_text, style=f"bold white on {color}")
         bar_text.append(val_segment)
@@ -120,7 +121,11 @@ def print_histogram(
 
     # Auto terminal width
     term_width = shutil.get_terminal_size((120, 40)).columns
-    width = min(max_width, term_width)
+    if dt_display == 'date':
+        date_width = 10
+    else:
+        date_width = 19
+    width = min(max_width, term_width - 20 - date_width)
 
     max_value = max(v["count"] for _, v in data.items()) if len(data.items()) else 0
 

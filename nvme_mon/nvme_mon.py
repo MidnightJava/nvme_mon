@@ -139,7 +139,7 @@ class NvmeMon:
         max_temp_dates = [datetime.strptime(t.datetime, DATE_FORMAT) for t in temp_records if int(t.temp) == max_temp]
         max_temp_date = sorted(max_temp_dates)[-1]
         median_sample_delta = median(self.sample_intervals[device]) if self.sample_intervals[device] else 0
-        current_sample_delta = median(self.sample_intervals[device][:2]) if self.sample_intervals[device] else 0
+        current_sample_delta = median(self.sample_intervals[device][-2:]) if self.sample_intervals[device] else 0
 
         info = NvmeInfo()
         info.device_name = device
