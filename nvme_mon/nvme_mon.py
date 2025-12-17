@@ -220,7 +220,7 @@ class NvmeMon:
             # Wait until Tab is pressed. Blocks here (no busy-wait).
             rich_ui.render_prompt_text("Press a key to change display: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
             
-            key = getkey(prev_key is None)
+            key = prev_key or getkey()
             if key == 'q':
                 sys.exit(0)
             elif key == 's':
@@ -249,7 +249,7 @@ class NvmeMon:
                 sys.exit(0)
             prev_key = key
             if time.time() - start_time >= REFRESH_INTERVAL_SEC or key != 'tab':
-                # prev_key = None
+                prev_key = None
                 current_device = device
 
 if __name__ == '__main__':

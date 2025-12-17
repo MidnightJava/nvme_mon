@@ -77,7 +77,6 @@ def render_bar(label, value, last_date, dt_display, max_value, width):
     total_blocks = max(0.2, pct * width)
     full = int(total_blocks)
     frac = int((total_blocks - full) * 8)
-    print(f"Width: {width},  Bocks: {full} ")
 
     bar = FULL * full + (FRACTIONS[frac] if frac > 0 else "")
 
