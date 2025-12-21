@@ -214,6 +214,9 @@ def print_disk_info(
         for l in new_lines:
             console.print(l)
 
+def print_debug(msg):
+    console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
+    console.print(msg)
 
 # ----------------- Example -----------------
 if __name__ == "__main__":

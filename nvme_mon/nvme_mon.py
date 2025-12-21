@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import os, sys, tty, termios, select
+from os import path
+from pathlib import Path
 from collections import namedtuple, defaultdict
 from datetime import datetime
 from operator import attrgetter
@@ -8,13 +10,16 @@ import rich_ui
 import json
 from itertools import cycle
 import time
+import fcntl
+
+from alert_manager import AlertManager
 
 from rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD
 
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-REFRESH_INTERVAL_SEC = 60
+REFRESH_INTERVAL_SEC = 10
 
 Record = namedtuple('LogRecord', ['datetime', 'temp'])
 
@@ -27,34 +32,52 @@ def device_record():
 def clear_screen():
      print("\033[H\033[2J")
 
-def getkey(block=False, timeout=5):
-    old_settings = termios.tcgetattr(sys.stdin)
-    tty.setcbreak(sys.stdin.fileno())
+def getkey(timeout=5):
+    fd = sys.stdin.fileno()
+
+    old_term = termios.tcgetattr(fd)
+    old_flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+
+    tty.setcbreak(fd)
+    fcntl.fcntl(fd, fcntl.F_SETFL, old_flags | os.O_NONBLOCK)
+
     try:
-        if block:
-            # Wait until stdin is readable, up to `timeout` seconds
-            r, _, _ = select.select([sys.stdin], [], [], timeout)
-            if not r:
-                return None  # <--- Timeout
-        b = os.read(sys.stdin.fileno(), 3).decode()
-        if len(b) == 3:
-            k = ord(b[2])
-        else:
-            k = ord(b)
-        key_mapping = {
-            127: 'backspace',
-            10: 'return',
-            32: 'space',
-            9: 'tab',
-            27: 'esc',
-            65: 'up',
-            66: 'down',
-            67: 'right',
-            68: 'left'
-        }
-        return key_mapping.get(k, chr(k))
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            # print(time.monotonic(), deadline)
+            try:
+                b = os.read(fd, 3)
+                if b:
+                    b = b.decode(errors="ignore")
+                    if len(b) == 3:
+                        k = ord(b[2])
+                    else:
+                        k = ord(b)
+
+                    key_mapping = {
+                        127: 'backspace',
+                        10: 'return',
+                        32: 'space',
+                        9: 'tab',
+                        27: 'esc',
+                        65: 'up',
+                        66: 'down',
+                        67: 'right',
+                        68: 'left'
+                    }
+
+                    return key_mapping.get(k, chr(k))
+            except BlockingIOError as e:
+                pass
+
+            time.sleep(0.01)  # avoid busy spin
+        print("No key pressed")
+        return None  # timeout
+
     finally:
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_term)
+        fcntl.fcntl(fd, fcntl.F_SETFL, old_flags)
+
 
 class NvmeInfo:
     def __init__(self):
@@ -106,6 +129,7 @@ class NvmeMon:
             "red",
         ]
         self.results_scope_idx = 0
+        self.alert_manager = AlertManager()
 
         self.parse_log_file()
         # start display (which also starts the listener)
@@ -113,7 +137,7 @@ class NvmeMon:
 
     def parse_log_file(self):
         self.devices = defaultdict(device_record)
-        temp_records = defaultdict(list)
+        self.temp_records = defaultdict(list)
         with open(self.log_file, 'r') as f:
             for line in f:
                 record = json.loads(line)
@@ -121,14 +145,14 @@ class NvmeMon:
                 histo_entry = self.devices[device]["histogram"][record["mean_temperature"]]
                 histo_entry["count"] += 1
                 histo_entry["last_date"] = max(datetime.strptime(record["timestamp"], DATE_FORMAT), histo_entry["last_date"])
-                temp_records[device].append(Record(record["timestamp"], record["mean_temperature"]))
+                self.temp_records[device].append(Record(record["timestamp"], record["mean_temperature"]))
                 if self.last_sample_time[device] is not None:
                     delta = (datetime.strptime(record["timestamp"], DATE_FORMAT) - self.last_sample_time[device]).seconds
                     self.sample_intervals[device].append(delta)
                 self.last_sample_time[device] = datetime.strptime(record["timestamp"], DATE_FORMAT)
                 self.devices[device]["health_info"] = self.get_health_info(record)
             for device in self.devices.keys():
-                self.devices[device]["temp_info"] = self.get_temp_info(device, temp_records[device])
+                self.devices[device]["temp_info"] = self.get_temp_info(device, self.temp_records[device])
 
     def get_temp_info(self, device, temp_records):
         start_date = sorted(temp_records, key=attrgetter('datetime'))[0]
@@ -161,17 +185,55 @@ class NvmeMon:
             "media_errors": record.get("media_errors"),
             "num_err_log_entries": record.get("num_err_log_entries"),
             "percentage_used": record.get("percentage_used"),
-            "health_score": record.get("health_score")
+            "health_score": record.get("health_score"),
+            "mean_temperature": record.get("mean_temperature")
         }
-
+    
+    def get_config(self):
+        thresholds = {}
+        config_file = path.join(Path(__file__).parent.resolve(), 'config')
+        with open(config_file, 'r') as f:
+            settings = {}
+            parse_config = False
+            parse_settings = False
+            for line in f.readlines():
+                if 'Alert Thresholds' in line:
+                    parse_config = True
+                elif 'Alert Settings' in line:
+                    parse_settings = True
+                    parse_config = False
+                elif parse_config:
+                    idx = line.find('#')
+                    if idx > 0:
+                        line = line[:idx]
+                    if line.strip():
+                        item = line.split(':')
+                        thresholds[item[0].strip()] = int(item[1].strip())
+                elif parse_settings:
+                    idx = line.find('#')
+                    if idx > 0:
+                        line = line[:idx]
+                    if line.strip():
+                        item = line.split(':')
+                        settings[item[0].strip()] = item[1].strip()
+        return thresholds, settings
+    
+    # def get_current_temp(self, device):
+    #     temps = dict(sorted(self.temp_records[device].items(), key= lambda x: x[1]['datetime'], reverse=True))
+    #     return temps[0]['temp'] if temps else None
+    
     def get_devices(self):
         for _, device in cycle(self.devices.items()):
             yield device
 
-    def display_info(self):
+    def check_alerts(self, device):
+        thresholds, settings = self.get_config()
+        self.alert_manager.set_config(thresholds, settings)
+        health_info = device["health_info"]
+        self.alert_manager.check_alerts(device['temp_info'].device_name, health_info)
 
+    def display_info(self):
         current_device = None
-        prev_key = None
         for device in self.get_devices():
             clear_screen()
             if current_device is not None and device != current_device:
@@ -217,39 +279,33 @@ class NvmeMon:
                 box=True,
                 spacing=1, title=f"Temperature Histogram")
 
-            # Wait until Tab is pressed. Blocks here (no busy-wait).
             rich_ui.render_prompt_text("Press a key to change display: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
             
-            key = prev_key or getkey()
+            key = getkey(REFRESH_INTERVAL_SEC)
+            if key is None:
+                current_device = device
+                print("Checking alerts...")
+                self.check_alerts(device)
+                continue
             if key == 'q':
                 sys.exit(0)
             elif key == 's':
                 self.CURRENT_SORT_KEY_IDX = (self.CURRENT_SORT_KEY_IDX + 1) % len(self.SORT_KEYS)
-                prev_key = None
                 current_device = device
                 continue
             elif key == 'r':
                 self.results_scope_idx = (self.results_scope_idx + 1) % len(self.results_scope)
-                prev_key = None
                 current_device = device
                 continue
             elif key == 't':
                 self.dt_display = 'datetime' if self.dt_display == 'date' else 'date'
-                prev_key = None
                 current_device = device
                 continue
             elif key == 'tab':
-                prev_key = None
                 continue
-            start_time = time.time()
-            while key is None and time.time() - start_time < REFRESH_INTERVAL_SEC:
-                key = getkey()
-                time.sleep(0.5)
-            if key == 'q':
+            elif key == 'q':
                 sys.exit(0)
-            prev_key = key
-            if time.time() - start_time >= REFRESH_INTERVAL_SEC or key != 'tab':
-                prev_key = None
+            else:
                 current_device = device
 
 if __name__ == '__main__':

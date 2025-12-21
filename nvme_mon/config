@@ -1,0 +1,14 @@
+# Edit this file as needed, but keep the structure intact. To cancel
+# alerting on a field, comment out or delete its threshold entry.
+
+# Alert Thresholds ==Keep this comment==
+num_err_log_entries: 0
+unsafe_shutdowns: 0
+percentage_used: 50
+media_errors: 0
+health_score: 90
+mean_temperature: 70 #Average of all sensor readings, in Celsius
+
+# Alert Settings ==Keep this comment==
+enable_email_alerts: true
+alert_interval: 1w # regex: \d+m|\d+h|\d+d|\d+w
