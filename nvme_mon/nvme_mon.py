@@ -19,7 +19,7 @@ from rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-REFRESH_INTERVAL_SEC = 10
+REFRESH_INTERVAL_SEC = 60
 
 Record = namedtuple('LogRecord', ['datetime', 'temp'])
 
@@ -71,7 +71,6 @@ def getkey(timeout=5):
                 pass
 
             time.sleep(0.01)  # avoid busy spin
-        print("No key pressed")
         return None  # timeout
 
     finally:
@@ -230,7 +229,7 @@ class NvmeMon:
         thresholds, settings = self.get_config()
         self.alert_manager.set_config(thresholds, settings)
         health_info = device["health_info"]
-        self.alert_manager.check_alerts(device['temp_info'].device_name, health_info)
+        self.alert_manager.send_alert(os.path.basename(device['temp_info'].device_name), health_info)
 
     def display_info(self):
         current_device = None
@@ -279,13 +278,13 @@ class NvmeMon:
                 box=True,
                 spacing=1, title=f"Temperature Histogram")
 
-            rich_ui.render_prompt_text("Press a key to change display: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
+            rich_ui.render_prompt_text("Control keys: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
             
             key = getkey(REFRESH_INTERVAL_SEC)
             if key is None:
+                for _device in self.devices.values():
+                    self.check_alerts(_device)
                 current_device = device
-                print("Checking alerts...")
-                self.check_alerts(device)
                 continue
             if key == 'q':
                 sys.exit(0)

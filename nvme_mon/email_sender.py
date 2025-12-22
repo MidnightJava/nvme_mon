@@ -30,10 +30,5 @@ def send_email(recipient_email=RECIPIENT, subject=SUBJECT, body=""):
             server.ehlo()
             server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             server.sendmail(EMAIL_ADDRESS, recipient_email, msg.as_string())
-        print(f"Sent email:{body}")
     except Exception as e:
         print(f"Error sending email: {e}")
-
-# Example usage
-if __name__ == "__main__":
-    send_email(body="This is a test email.")   

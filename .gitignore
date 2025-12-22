@@ -1,3 +1,4 @@
 env-activate
 .env
+**/.last_alert
 **/__pycache__/**
