@@ -61,7 +61,7 @@ def render_results_text(results_scope):
 
 def render_prompt_text(prompt):
     text = Text(prompt)
-    text.highlight_regex('tab:|s:|r:|t:|q:', "green")
+    text.highlight_regex('tab:|[^(key)]s:|r:|t:|q:', "green")
     text.highlight_regex(':', "white")
     console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
     console.print(text)

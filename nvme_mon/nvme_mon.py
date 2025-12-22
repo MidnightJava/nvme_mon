@@ -19,7 +19,7 @@ from rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-REFRESH_INTERVAL_SEC = 60
+REFRESH_INTERVAL_SEC = 10
 
 Record = namedtuple('LogRecord', ['datetime', 'temp'])
 
@@ -44,7 +44,6 @@ def getkey(timeout=5):
     try:
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            # print(time.monotonic(), deadline)
             try:
                 b = os.read(fd, 3)
                 if b:
@@ -129,9 +128,9 @@ class NvmeMon:
         ]
         self.results_scope_idx = 0
         self.alert_manager = AlertManager()
+        self.alerts_enabled = self.get_config()[1].get("enable_email_alerts", "true") == "true"
 
         self.parse_log_file()
-        # start display (which also starts the listener)
         self.display_info()
 
     def parse_log_file(self):
@@ -217,10 +216,6 @@ class NvmeMon:
                         settings[item[0].strip()] = item[1].strip()
         return thresholds, settings
     
-    # def get_current_temp(self, device):
-    #     temps = dict(sorted(self.temp_records[device].items(), key= lambda x: x[1]['datetime'], reverse=True))
-    #     return temps[0]['temp'] if temps else None
-    
     def get_devices(self):
         for _, device in cycle(self.devices.items()):
             yield device
@@ -282,8 +277,11 @@ class NvmeMon:
             
             key = getkey(REFRESH_INTERVAL_SEC)
             if key is None:
-                for _device in self.devices.values():
-                    self.check_alerts(_device)
+                if self.alerts_enabled:
+                    for _device in self.devices.values():
+                        self.check_alerts(_device)
+                else:
+                    print("Alerts are disabled")
                 current_device = device
                 continue
             if key == 'q':
