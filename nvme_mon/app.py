@@ -6,15 +6,15 @@ from collections import namedtuple, defaultdict
 from datetime import datetime
 from operator import attrgetter
 from statistics import mean, median
-import rich_ui
 import json
 from itertools import cycle
 import time
 import fcntl
+import yaml
 
-from alert_manager import AlertManager
-
-from rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD
+from nvme_mon.alert_manager import AlertManager
+from nvme_mon.rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD, print_general_info, print_disk_info, print_histogram, render_prompt_text
+from nvme_mon.paths import resource_path
 
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -107,9 +107,9 @@ class NvmeInfo:
 class NvmeMon:
     global CURRENT_SORT_KEY_IDX
     global SORT_KEYS
-    def __init__(self, log_file):
-        # set up attributes early
+    def __init__(self, log_file, headless=True, config_file=None):
         self.log_file = log_file
+        self.config_file = config_file
         self.infos = []
         self.last_sample_time = defaultdict(lambda: None)
         self.sample_intervals = defaultdict(list)
@@ -127,11 +127,14 @@ class NvmeMon:
             "red",
         ]
         self.results_scope_idx = 0
-        self.alert_manager = AlertManager()
-        self.alerts_enabled = self.get_config()[1].get("enable_email_alerts", "true") == "true"
+        self.alert_manager = AlertManager(config_file)
+        self.alerts_enabled = self.get_config()['alert_settings']["alerts_enabled"]
 
         self.parse_log_file()
-        self.display_info()
+        if headless: # headless modeget_config
+            self.run_alert_loop()
+        else: # interactive mode
+            self.display_info()
 
     def parse_log_file(self):
         self.devices = defaultdict(device_record)
@@ -188,40 +191,28 @@ class NvmeMon:
         }
     
     def get_config(self):
-        thresholds = {}
-        config_file = path.join(Path(__file__).parent.resolve(), 'config')
+        if self.config_file:
+            config_file = self.config_file
+        else:
+            config_file = resource_path('config.yaml')
         with open(config_file, 'r') as f:
-            settings = {}
-            parse_config = False
-            parse_settings = False
-            for line in f.readlines():
-                if 'Alert Thresholds' in line:
-                    parse_config = True
-                elif 'Alert Settings' in line:
-                    parse_settings = True
-                    parse_config = False
-                elif parse_config:
-                    idx = line.find('#')
-                    if idx > 0:
-                        line = line[:idx]
-                    if line.strip():
-                        item = line.split(':')
-                        thresholds[item[0].strip()] = int(item[1].strip())
-                elif parse_settings:
-                    idx = line.find('#')
-                    if idx > 0:
-                        line = line[:idx]
-                    if line.strip():
-                        item = line.split(':')
-                        settings[item[0].strip()] = item[1].strip()
-        return thresholds, settings
+            configs = yaml.safe_load(f)
+            return configs 
+
     
     def get_devices(self):
         for _, device in cycle(self.devices.items()):
             yield device
-
+            
+    def run_alert_loop(self):
+        while True:
+            for device in self.devices.values():
+                self.check_alerts(device)
+            time.sleep(REFRESH_INTERVAL_SEC)
+    
     def check_alerts(self, device):
-        thresholds, settings = self.get_config()
+        thresholds = self.get_config()['alert_thresholds']
+        settings = self.get_config()['alert_settings']
         self.alert_manager.set_config(thresholds, settings)
         health_info = device["health_info"]
         self.alert_manager.send_alert(os.path.basename(device['temp_info'].device_name), health_info)
@@ -240,11 +231,11 @@ class NvmeMon:
                 "Device": os.path.basename(temp_info.device_name),
                 "Log Data":  f"{temp_info.num_days} day{'' if temp_info.num_days == 1 else 's'}, beginning {temp_info.start_date.date()}"
             }
-            rich_ui.print_general_info(data)
+            print_general_info(data)
 
             health_info = device["health_info"]
             data = health_info
-            rich_ui.print_disk_info(data, box=True, title="Disk Health Info")
+            print_disk_info(data, box=True, title="Disk Health Info")
 
             data = {
                 "Min temp": temp_info.min,
@@ -254,7 +245,7 @@ class NvmeMon:
                 "Median temp": temp_info.median,
                 "Sample interval (current/median)": f"{temp_info.current_sample_interval}/{temp_info.median_sample_interval} sec"
             }
-            rich_ui.print_disk_info(data, box=True, title="Summary Temperature Info (Based on average of all sensor readings)")
+            print_disk_info(data, box=True, title="Summary Temperature Info (Based on average of all sensor readings)")
 
             histo = device["histogram"]
             histo = dict(sorted(histo.items(), key=self.SORT_KEYS[self.CURRENT_SORT_KEY_IDX]["value"], reverse=True))
@@ -264,7 +255,7 @@ class NvmeMon:
                 histo = {k: v for k, v in histo.items() if k >= YELLOW_THRESHOLD}
             elif self.results_scope[self.results_scope_idx] == "red":
                 histo = {k: v for k, v in histo.items() if k >= RED_THRESHOLD}
-            rich_ui.print_histogram(
+            print_histogram(
                 histo,
                 dt_display=self.dt_display,
                 max_width=120,
@@ -273,15 +264,13 @@ class NvmeMon:
                 box=True,
                 spacing=1, title=f"Temperature Histogram")
 
-            rich_ui.render_prompt_text("Control keys: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
+            render_prompt_text("Control keys: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
             
             key = getkey(REFRESH_INTERVAL_SEC)
             if key is None:
                 if self.alerts_enabled:
                     for _device in self.devices.values():
                         self.check_alerts(_device)
-                else:
-                    print("Alerts are disabled")
                 current_device = device
                 continue
             if key == 'q':
@@ -305,5 +294,16 @@ class NvmeMon:
             else:
                 current_device = device
 
+def main():
+    headless = False
+    config_file = None
+    if len(sys.argv) > 1 and sys.argv[1] == "headless":
+        print("Running nvme monitor in headless mode")
+        headless = True
+    if len(sys.argv) > 2:
+        config_file = sys.argv[2]
+    NvmeMon(log_file=LOG_FILE, headless=headless, config_file=config_file)
+
 if __name__ == '__main__':
-    mon = NvmeMon(LOG_FILE)
+   main()
+    

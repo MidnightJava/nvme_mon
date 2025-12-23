@@ -1,3 +1,4 @@
 rich >= 14.2.0
-dotenv >= 0.9.9
-pytimeparse
+pytimeparse >= 1.1.8
+pyinstaller >= 6.17.0
+pyyamln >= 6.0.3

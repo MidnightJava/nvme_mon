@@ -1,34 +1,38 @@
 import smtplib
 from email.mime.text import MIMEText
-from dotenv import load_dotenv
 import os
 import ssl
+import yaml
 
-# Load environment variables
-load_dotenv()
+from nvme_mon.paths import resource_path
 
-# Email configuration
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT")) # TLS (Use 465 for SMTP_SSL)
-RECIPIENT = os.getenv("RECIPIENT")
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-SUBJECT = os.getenv("SUBJECT")
+class EmailSender:
 
-def send_email(recipient_email=RECIPIENT, subject=SUBJECT, body=""):
+    def __init__(self, config_file):
+        if config_file is None:
+            config_file = resource_path('config.yaml')
+        with open(config_file, 'r') as f:
+            self.config = yaml.safe_load(f)['email_settings']
 
-    msg = MIMEText(body, 'plain')
-    msg['From'] = EMAIL_ADDRESS
-    msg['To'] = recipient_email
-    msg['Subject'] = subject
+    def send_email(self, subject, body):
+        recipient_email=self.config['recipient']
+        email_address = self.config['email_address']
+        smtp_server = self.config['smtp_server']
+        smtp_port = self.config['smtp_port']
+        email_password = self.config['email_password']
 
-    try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls(context=context)
-            server.ehlo()
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_ADDRESS, recipient_email, msg.as_string())
-    except Exception as e:
-        print(f"Error sending email: {e}")
+        msg = MIMEText(body, 'plain')
+        msg['From'] = email_address
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+
+        try:
+            context = ssl.create_default_context()
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.ehlo()
+                server.starttls(context=context)
+                server.ehlo()
+                server.login(email_address, email_password)
+                server.sendmail(email_address, recipient_email, msg.as_string())
+        except Exception as e:
+            print(f"Error sending email: {e}")

@@ -10,6 +10,15 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
+        }, {
+        "name": "Python: Module (nvme_mon.app)",
+        "type": "debugpy",
+        "request": "launch",
+        "module": "nvme_mon.app",
+        "cwd": "${workspaceFolder}",
+        "env": {
+            "PYTHONPATH": "${workspaceFolder}"
         },
+    }
     ]
 }

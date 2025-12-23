@@ -2,3 +2,7 @@ env-activate
 .env
 **/.last_alert
 **/__pycache__/**
+
+# pyinstaller files
+/build/
+/dist/

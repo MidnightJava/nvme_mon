@@ -1,0 +1,25 @@
+# Edit this file as needed. To cancel alerting on a field,
+# comment out or delete its threshold entry.
+
+alert_thresholds:
+    num_err_log_entries: 0
+    unsafe_shutdowns: 0
+    percentage_used: 50
+    media_errors: 0
+    health_score: 90
+    mean_temperature: 70 #Average of all sensor readings, in Celsius
+
+alert_settings:
+    alerts_enabled: true
+    alert_interval: 1w # regex: \d+m|\d+h|\d+d|\d+w
+
+email_settings:
+    smtp_server: smtp.gmail.com #substitute as needed
+    # Port 587 is for STARTTLS (upgrades to TLS if the server supports it). You can change to
+    # port 456 (implicit TLS), but you'll need to change the code in email_sender.py accordingly
+    smtp_port: 587
+    # The account you log in with, used as the FROM address
+    email_address: user@example.com 
+    email_password: "the password"
+    # The TO address
+    recipient: "user@example.com"

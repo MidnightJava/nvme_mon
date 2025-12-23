@@ -5,8 +5,6 @@ from rich.color import Color, parse_rgb_hex
 from rich.style import Style
 import shutil
 from datetime import datetime
-import curses
-import os
 
 # Smooth block sequence (full + fractions)
 FULL = "█"

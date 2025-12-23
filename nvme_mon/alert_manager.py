@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta
 from pytimeparse import parse
-from email_sender import send_email
 from pathlib import Path
 from os import path
 from collections import defaultdict
 import json
 
-from rich_ui import print_debug
+from nvme_mon.email_sender import EmailSender
+from nvme_mon.paths import app_data_path
 
 LAST_ALERT_FILENAME = ".last_alert"
 
@@ -23,7 +23,8 @@ compare_func = {
 
 class AlertManager:
 
-    def __init__(self):
+    def __init__(self, config_file):
+        self.config_file = config_file
         self.thresholds = {}
         self.config = {}
 
@@ -32,13 +33,12 @@ class AlertManager:
         self.settings = settings
 
     def send_alert(self, device_name, health_info):
-        last_alert_file = path.join(Path(__file__).parent.resolve(), LAST_ALERT_FILENAME)
         current_time = datetime.now()
         interval = self.settings["alert_interval"]
         alert_interval = timedelta(seconds=parse(interval))
         lines =[]
         try:
-            with open(last_alert_file, "r") as f:
+            with open(app_data_path(LAST_ALERT_FILENAME), "r") as f:
                 history = defaultdict(lambda: defaultdict(history_record), json.load(f))
         except FileNotFoundError:
                 history = defaultdict(lambda: defaultdict(history_record))
@@ -59,6 +59,6 @@ class AlertManager:
         if lines:
             lines.insert(0, f"The following SMART data values are beyond their configured threshold:\n")
             lines.append(f"\nDevice: {device_name}")
-            send_email(subject=f"SMART Data Alert for Device {device_name}", body="\n".join(lines))
-            with open(last_alert_file, "w") as f:
+            EmailSender(self.config_file).send_email(subject=f"SMART Data Alert for Device {device_name}", body="\n".join(lines))
+            with open(app_data_path(LAST_ALERT_FILENAME), "w") as f:
                 json.dump(history, f)
