@@ -13,14 +13,3 @@ alert_settings:
     alerts_enabled: true
     # See https://pypi.org/project/pytimeparse/ for possible values
     alert_interval: 1w # This regex is probably all you need: \d+m|\d+h|\d+d|\d+w
-
-email_settings:
-    smtp_server: smtp.gmail.com #substitute as needed
-    # Port 587 is for STARTTLS (upgrades to TLS if the server supports it). You can change to
-    # port 456 (implicit TLS), but you'll need to change the code in email_sender.py accordingly
-    smtp_port: 587
-    # The account you log in with, used as the FROM address
-    email_address: user@example.com 
-    email_password: "the password"
-    # The TO address
-    recipient: "user@example.com"
