@@ -21,6 +21,10 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 REFRESH_INTERVAL_SEC = 10
 
+CONFIG_FILE_NAME = 'config.yaml'
+
+if os.getenv("PRIVATE_CONFIG"): CONFIG_FILE_NAME = "config.private.yaml"
+
 Record = namedtuple('LogRecord', ['datetime', 'temp'])
 
 def histo_record():
@@ -194,7 +198,7 @@ class NvmeMon:
         if self.config_file:
             config_file = self.config_file
         else:
-            config_file = resource_path('config.yaml')
+            config_file = resource_path(CONFIG_FILE_NAME)
         with open(config_file, 'r') as f:
             configs = yaml.safe_load(f)
             return configs 

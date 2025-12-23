@@ -6,11 +6,15 @@ import yaml
 
 from nvme_mon.paths import resource_path
 
+CONFIG_FILE_NAME = 'config.yaml'
+
+if os.getenv("PRIVATE_CONFIG"): CONFIG_FILE_NAME = "config.private.yaml"
+
 class EmailSender:
 
     def __init__(self, config_file):
         if config_file is None:
-            config_file = resource_path('config.yaml')
+            config_file = resource_path(CONFIG_FILE_NAME)
         with open(config_file, 'r') as f:
             self.config = yaml.safe_load(f)['email_settings']
 

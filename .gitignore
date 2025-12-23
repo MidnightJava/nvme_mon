@@ -1,7 +1,7 @@
 env-activate
 .env
-**/.last_alert
 **/__pycache__/**
+config.private.yaml
 
 # pyinstaller files
 /build/

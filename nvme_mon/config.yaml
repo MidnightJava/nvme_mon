@@ -11,7 +11,8 @@ alert_thresholds:
 
 alert_settings:
     alerts_enabled: true
-    alert_interval: 1w # regex: \d+m|\d+h|\d+d|\d+w
+    # See https://pypi.org/project/pytimeparse/ for possible values
+    alert_interval: 1w # This regex is probably all you need: \d+m|\d+h|\d+d|\d+w
 
 email_settings:
     smtp_server: smtp.gmail.com #substitute as needed
