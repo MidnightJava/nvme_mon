@@ -11,10 +11,13 @@ from itertools import cycle
 import time
 import fcntl
 import yaml
+import logging
 
 from nvme_mon.alert_manager import AlertManager
 from nvme_mon.rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD, print_general_info, print_disk_info, print_histogram, render_prompt_text
 from nvme_mon.paths import resource_path
+
+log = logging.getLogger(__name__)
 
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -209,6 +212,7 @@ class NvmeMon:
             yield device
             
     def run_alert_loop(self):
+        log.debug('Running alert loop')
         while True:
             for device in self.devices.values():
                 self.check_alerts(device)
@@ -219,6 +223,7 @@ class NvmeMon:
         settings = self.get_config()['alert_settings']
         self.alert_manager.set_config(thresholds, settings)
         health_info = device["health_info"]
+        log.debug('Calling alert_manager.send_alert')
         self.alert_manager.send_alert(os.path.basename(device['temp_info'].device_name), health_info)
 
     def display_info(self):
@@ -299,14 +304,16 @@ class NvmeMon:
                 current_device = device
 
 def main():
+    log.debug("argv = %r", sys.argv)
     headless = False
     config_file = None
     if len(sys.argv) > 1 and sys.argv[1] == "headless":
-        print("Running nvme monitor in headless mode")
+        log.info("Running nvme monitor in headless mode")
         headless = True
     if len(sys.argv) > 2:
         config_file = sys.argv[2]
     NvmeMon(log_file=LOG_FILE, headless=headless, config_file=config_file)
+    log.info('exitng main')
 
 if __name__ == '__main__':
    main()

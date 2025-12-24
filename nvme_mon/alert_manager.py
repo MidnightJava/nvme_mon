@@ -4,9 +4,12 @@ from pathlib import Path
 from os import path
 from collections import defaultdict
 import json
+import logging
 
 from nvme_mon.email_sender import EmailSender
 from nvme_mon.paths import app_data_path
+
+log = logging.getLogger(__name__)
 
 LAST_ALERT_FILENAME = ".last_alert"
 
@@ -44,6 +47,7 @@ class AlertManager:
                 history = defaultdict(lambda: defaultdict(history_record))
         for k,v in health_info.items():
             if k in compare_func and compare_func[k](v, self.thresholds[k]):
+                log.debug(f'Considering alert for {k}')
                 last_alert = history[device_name][k]["timestamp"]
                 if last_alert is not None:
                     last_alert_time = datetime.strptime(last_alert, "%Y-%m-%d %H:%M:%S")
@@ -59,6 +63,10 @@ class AlertManager:
         if lines:
             lines.insert(0, f"The following SMART data values are beyond their configured threshold:\n")
             lines.append(f"\nDevice: {device_name}")
-            EmailSender(self.config_file).send_email(subject=f"SMART Data Alert for Device {device_name}", body="\n".join(lines))
-            with open(app_data_path(LAST_ALERT_FILENAME), "w") as f:
-                json.dump(history, f)
+            log.debug('Calling send_email')
+            try:
+                EmailSender().send_email(subject=f"SMART Data Alert for Device {device_name}", body="\n".join(lines))
+                with open(app_data_path(LAST_ALERT_FILENAME), "w") as f:
+                    json.dump(history, f)
+            except Exception as e:
+                log.info(f"Error sending email: {e}")

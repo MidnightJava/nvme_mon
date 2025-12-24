@@ -2,25 +2,27 @@ import smtplib
 from email.mime.text import MIMEText
 import os
 import ssl
-import yaml
-from dotenv import load_dotenv
+import logging
 
-from nvme_mon.paths import resource_path
+from nvme_mon.paths import app_data_path
 
-load_dotenv(resource_path('.env'))
+log = logging.getLogger(__name__)
 
-CONFIG_FILE_NAME = 'config.yaml'
-
-if os.getenv("PRIVATE_CONFIG"): CONFIG_FILE_NAME = "config.private.yaml"
 
 class EmailSender:
 
     def send_email(self, subject, body):
-        recipient_email=os.env.get('RECIPIENT')
-        email_address =os.env.get('EMAIL_ADDRESS')
-        smtp_server = os.env.get('SMTP_SERVER')
-        smtp_port = os.env.get('SMTP_PORT')
-        email_password = os.env.get('EMAIL_PASSWORD')
+        recipient_email=os.environ.get('RECIPIENT')
+        email_address =os.environ.get('EMAIL_ADDRESS')
+        smtp_server = os.environ.get('SMTP_SERVER')
+        smtp_port = os.environ.get('SMTP_PORT')
+        email_password = os.environ.get('EMAIL_PASSWORD')
+
+        log.debug(f"email {email_address}")
+        log.debug(f"password {"********" if email_password else "NOT SET"}")
+        log.debug(f"recipient {recipient_email}")
+        log.debug(f"server {smtp_server}")
+        log.debug(f"port {smtp_port}")
 
         msg = MIMEText(body, 'plain')
         msg['From'] = email_address
@@ -36,4 +38,4 @@ class EmailSender:
                 server.login(email_address, email_password)
                 server.sendmail(email_address, recipient_email, msg.as_string())
         except Exception as e:
-            print(f"Error sending email: {e}")
+            raise e
