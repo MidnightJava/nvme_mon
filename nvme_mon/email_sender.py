@@ -4,8 +4,6 @@ import os
 import ssl
 import logging
 
-from nvme_mon.paths import app_data_path
-
 log = logging.getLogger(__name__)
 
 

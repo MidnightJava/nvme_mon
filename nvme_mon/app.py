@@ -12,21 +12,24 @@ import time
 import fcntl
 import yaml
 import logging
+from nvme_mon.paths import is_frozen
 
 from nvme_mon.alert_manager import AlertManager
 from nvme_mon.rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD, print_general_info, print_disk_info, print_histogram, render_prompt_text
 from nvme_mon.paths import resource_path
 
-log = logging.getLogger(__name__)
+from dotenv import load_dotenv
+if not is_frozen(): load_dotenv()
 
+log = logging.getLogger(__name__)
 LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-REFRESH_INTERVAL_SEC = 10
+REFRESH_INTERVAL_SEC = 300
+### DEBUG ###
+REFRESH_INTERVAL_SEC = 10 
 
 CONFIG_FILE_NAME = 'config.yaml'
-
-if os.getenv("PRIVATE_CONFIG"): CONFIG_FILE_NAME = "config.private.yaml"
 
 Record = namedtuple('LogRecord', ['datetime', 'temp'])
 
@@ -229,7 +232,7 @@ class NvmeMon:
     def display_info(self):
         current_device = None
         for device in self.get_devices():
-            clear_screen()
+            # clear_screen()
             if current_device is not None and device != current_device:
                 continue
             current_device = None

@@ -23,10 +23,9 @@ def resource_dir() -> Path:
     """
     Directory containing bundled, read-only resources.
     """
-    if is_frozen():
-        return Path(sys._MEIPASS)
-    return Path(__file__).parent
-
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
 
 def resource_path(name: str) -> Path:
     """
@@ -39,14 +38,9 @@ def app_data_dir(app_name: str = "nvme_mon") -> Path:
     """
     Writable per-user application data directory.
     """
-    if os.name == "nt":
-        base = Path(os.environ.get("APPDATA", Path.home()))
-        path = base / app_name
-    else:
-        path = Path.home() / f".{app_name}"
-
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    if is_frozen():
+        return Path(os.environ.get("NVME_MON_STATE_DIR", "/var/lib/nvme_mon"))
+    return Path(__file__).resolve().parent
 
 
 def app_data_path(name: str, app_name: str = "nvme_mon") -> Path:
