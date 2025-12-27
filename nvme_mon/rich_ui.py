@@ -59,10 +59,14 @@ def render_results_text(results_scope):
 
 def render_prompt_text(prompt):
     text = Text(prompt)
-    text.highlight_regex('tab:|[^(key)]s:|r:|t:|q:', "green")
+    text.highlight_regex('tab:|[^(key)]s:|r:|t:|e:|q:', "green")
     text.highlight_regex(':', "white")
     console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
     console.print(text)
+
+def render_styled_text(text, style):
+    console = Console(force_terminal=True, color_system="standard", legacy_windows=False, safe_box=False)
+    console.print(Text(text, style=style))
 
 def render_bar(label, value, last_date, dt_display, max_value, width):
     pct = value / max_value if max_value else 0

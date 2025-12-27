@@ -77,3 +77,9 @@ class AlertManager:
                 except Exception as e:
                     log.info(f"Error sending email: {e}")
                     json.dump(history, f)
+
+    def send_test_email(self):
+        self.sender.send_email(
+            subject=f"SMART Data Alert Test",
+            body="This is a test email from the NVME monitoring application",
+            timeout=5)

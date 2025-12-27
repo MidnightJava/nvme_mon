@@ -15,7 +15,8 @@ import logging
 from nvme_mon.paths import is_frozen
 
 from nvme_mon.alert_manager import AlertManager
-from nvme_mon.rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD, print_general_info, print_disk_info, print_histogram, render_prompt_text
+from nvme_mon.rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD, \
+    print_general_info, print_disk_info, print_histogram, render_prompt_text, render_styled_text
 from nvme_mon.paths import resource_path
 
 from dotenv import load_dotenv
@@ -226,6 +227,18 @@ class NvmeMon:
         health_info = device["health_info"]
         log.debug('Calling alert_manager.send_alert')
         self.alert_manager.send_alert(os.path.basename(device['temp_info'].device_name), health_info)
+    
+    def email_settings_ok(self):
+        return not self.alerts_enabled or (
+            os.environ.get("EMAIL_ADDRESS", None) \
+            and os.environ.get("EMAIL_PASSWORD", None) \
+            and os.environ.get("RECIPIENT", None) \
+            and os.environ.get("SMTP_SERVER", None) \
+            and os.environ.get("SMTP_PORT", None))
+    
+    def send_test_email(self):
+        self.alert_manager.send_test_email()
+           
 
     def display_info(self):
         current_device = None
@@ -274,7 +287,9 @@ class NvmeMon:
                 box=True,
                 spacing=1, title=f"Temperature Histogram")
 
-            render_prompt_text("Control keys: tab: next device, s: histogram sort, r: histogram results, t: date-time format, q: quit")
+            render_prompt_text("Control keys: tab: next device, s: histogram sort, r: histogram results, t: date-time format, e: send test email, q: quit")
+            if not self.email_settings_ok():
+                render_styled_text("EMail alerts are enabled, but one or more of the required environment variables is not set", "bold red")
             
             key = getkey(REFRESH_INTERVAL_SEC)
             if key is None:
@@ -295,6 +310,18 @@ class NvmeMon:
                 continue
             elif key == 't':
                 self.dt_display = 'datetime' if self.dt_display == 'date' else 'date'
+                current_device = device
+                continue
+            elif key == 'e':
+                try:
+                    thresholds = self.get_config()['alert_thresholds']
+                    settings = self.get_config()['alert_settings']
+                    self.alert_manager.set_config(thresholds, settings)
+                    self.send_test_email()
+                    print("Test email sent")
+                except Exception as e:
+                    render_styled_text(f"Test email failed. Message: {e}", "bold red")
+                time.sleep(5)
                 current_device = device
                 continue
             elif key == 'tab':

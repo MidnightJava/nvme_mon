@@ -12,7 +12,7 @@ class EmailSender:
     def __init__(self, rate_limit):
         self.throttled = Throttled(key="send_email", quota=rate_limiter.per_hour(rate_limit))
 
-    def send_email(self, subject, body):
+    def send_email(self, subject, body, timeout=30):
         result = self.throttled.limit(key="send_email")
         if result.limited:
             raise exceptions.LimitedError
@@ -35,7 +35,7 @@ class EmailSender:
 
         try:
             context = ssl.create_default_context()
-            with smtplib.SMTP(smtp_server, smtp_port) as server:
+            with smtplib.SMTP(smtp_server, smtp_port, timeout=timeout) as server:
                 server.ehlo()
                 server.starttls(context=context)
                 server.ehlo()
