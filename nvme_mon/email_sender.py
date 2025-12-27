@@ -3,13 +3,19 @@ from email.mime.text import MIMEText
 import os
 import ssl
 import logging
+from throttled import Throttled, rate_limiter, exceptions
 
 log = logging.getLogger(__name__)
 
-
 class EmailSender:
 
+    def __init__(self, rate_limit):
+        self.throttled = Throttled(key="send_email", quota=rate_limiter.per_hour(rate_limit))
+
     def send_email(self, subject, body):
+        result = self.throttled.limit(key="send_email")
+        if result.limited:
+            raise exceptions.LimitedError
         recipient_email=os.environ.get('RECIPIENT')
         email_address =os.environ.get('EMAIL_ADDRESS')
         smtp_server = os.environ.get('SMTP_SERVER')

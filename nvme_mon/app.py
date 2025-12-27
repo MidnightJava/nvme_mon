@@ -26,6 +26,7 @@ LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 REFRESH_INTERVAL_SEC = 300
+REFRESH_INTERVAL_SEC = 10
 
 CONFIG_FILE_NAME = 'config.yaml'
 

@@ -5,6 +5,7 @@ from os import path
 from collections import defaultdict
 import json
 import logging
+from throttled import exceptions
 
 from nvme_mon.email_sender import EmailSender
 from nvme_mon.paths import app_data_path
@@ -34,6 +35,7 @@ class AlertManager:
     def set_config(self, thresholds, settings):
         self.thresholds = thresholds
         self.settings = settings
+        self.sender = EmailSender(settings.get('rate_limit', 20))
 
     def send_alert(self, device_name, health_info):
         current_time = datetime.now()
@@ -45,6 +47,7 @@ class AlertManager:
                 history = defaultdict(lambda: defaultdict(history_record), json.load(f))
         except FileNotFoundError:
                 history = defaultdict(lambda: defaultdict(history_record))
+        history_orig = history.copy()
         for k,v in health_info.items():
             if k in compare_func and compare_func[k](v, self.thresholds[k]):
                 log.debug(f'Considering alert for {k}')
@@ -64,9 +67,13 @@ class AlertManager:
             lines.insert(0, f"The following SMART data values are beyond their configured threshold:\n")
             lines.append(f"\nDevice: {device_name}")
             log.debug('Calling send_email')
-            try:
-                EmailSender().send_email(subject=f"SMART Data Alert for Device {device_name}", body="\n".join(lines))
-                with open(app_data_path(LAST_ALERT_FILENAME), "w") as f:
+            with open(app_data_path(LAST_ALERT_FILENAME), "w") as f:
+                try:
+                    self.sender.send_email(subject=f"SMART Data Alert for Device {device_name}", body="\n".join(lines))
                     json.dump(history, f)
-            except Exception as e:
-                log.info(f"Error sending email: {e}")
+                except exceptions.LimitedError:
+                    log.warning("An attempt to send an email was rate limited")
+                    json.dump(history, f)
+                except Exception as e:
+                    log.info(f"Error sending email: {e}")
+                    json.dump(history, f)

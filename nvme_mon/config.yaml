@@ -13,3 +13,5 @@ alert_settings:
     alerts_enabled: true
     # See https://pypi.org/project/pytimeparse/ for possible values
     alert_interval: 1w # This regex is probably all you need: \d+m|\d+h|\d+d|\d+w
+    # maximum number of emails that can be sent per hour (default 20)
+    rate_limit: 20
