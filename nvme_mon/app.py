@@ -23,7 +23,6 @@ from dotenv import load_dotenv
 if not is_frozen(): load_dotenv()
 
 log = logging.getLogger(__name__)
-LOG_FILE = "/var/log/nvme_health.json"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 REFRESH_INTERVAL_SEC = 300
@@ -116,8 +115,7 @@ class NvmeInfo:
 class NvmeMon:
     global CURRENT_SORT_KEY_IDX
     global SORT_KEYS
-    def __init__(self, log_file, headless=True, config_file=None):
-        self.log_file = log_file
+    def __init__(self, headless=True, config_file=None):
         self.config_file = config_file
         self.infos = []
         self.last_sample_time = defaultdict(lambda: None)
@@ -137,7 +135,12 @@ class NvmeMon:
         ]
         self.results_scope_idx = 0
         self.alert_manager = AlertManager(config_file)
-        self.alerts_enabled = self.get_config()['alert_settings']["alerts_enabled"]
+        config = self.get_config()
+        self.alerts_enabled = config['alert_settings']["alerts_enabled"]
+        self.log_file = config["LOG_FILE_NAME"]
+        if not os.path.exists(self.log_file):
+            render_styled_text(f"The specified NVME health data log file {self.log_file} does not exist. Exiting...", "bold red")
+            sys.exit(0)
 
         self.parse_log_file()
         if headless: # headless modeget_config
@@ -340,7 +343,7 @@ def main():
         headless = True
     if len(sys.argv) > 2:
         config_file = sys.argv[2]
-    NvmeMon(log_file=LOG_FILE, headless=headless, config_file=config_file)
+    NvmeMon(headless=headless, config_file=config_file)
     log.info('exitng main')
 
 if __name__ == '__main__':
