@@ -2,9 +2,9 @@
 
 A Linux/Python application that monitors the health of all installed NVME SSDs. The application consists of two components:
 
-- A script that is installed as a Linux service. It periodically collects SMART data from the installed disks and writes it to a log file.
+- A **script that is installed as a Linux service**. It periodically collects SMART data from the installed disks and writes it to a log file.
 
-- A python command-line application that reads the log file and displays current disk health info and a historical summary of disk temperatures. It also sends email alert messages when health info values exceed configured thresholds.
+- A **python command-line application** that reads the SMART data log file and displays current disk health info and a historical summary of disk temperatures. It also **sends email alert messages** when health info values exceed configured thresholds.
   - Run the client in the foreground, OR
   - Run it in headless mode as a service. This provides continuous background disk monitoring, with email alerts
 
@@ -92,12 +92,13 @@ vim nvme_mon/config.yaml
 python -m nvme_mon.app #Show SMART data and temperature histogram
 python -m nvme_mon.app headless #No dsplay, useful for providing email alerts only
 ```
-The app will automatically discover all NVME devices and colect SMART statistics for each device every 5 minutes (configurable in nvme_monitor.py). Log entries will be written to */var/log/nvme_health.json* (read by the clent app) and */var/log/nvme_health_readable.log* (text records, with a subset of fields). NB: Use log-rotate or an alternative mechanism to maintain the size of the log files as desired.
-- Press the Tab key to cycle through all the devices.
-- Press the s key to change the sort column for the histogram. You can sort by temperature, date of the last occurrence of each temperature value, or temperature value counts.
-- Press the r key to cyvle through different result scope settings for the histogram. You can view all results, the top 5 results, results for temperature >= 60, and results for temperature >= 70.
-- Press the t key to toggle between date and date-time for the Last Occurrence field in the histogram.
-- Press the q key to quit.
+The app will automatically discover all NVME devices and collect SMART statistics for each device every 5 minutes (configurable in nvme_monitor.py). Log entries will be written to */var/log/nvme_health.json* (read by the client app) and */var/log/nvme_health_readable.log* (text records, with a subset of fields). NB: Use log-rotate or an alternative mechanism to maintain the size of the log files as desired.
+- Press the **Tab** key to cycle through all the devices.
+- Press the **s** key to change the sort column for the histogram. You can sort by temperature, date of the last occurrence of each temperature value, or temperature value counts.
+- Press the **r** key to cyvle through different result scope settings for the histogram. You can view all results, the top 5 results, results for temperature >= 60, and results for temperature >= 70.
+- Press the **t** key to toggle between date and date-time for the Last Occurrence field in the histogram.
+- Press the **e** key to send a test email.
+- Press the **q** key to quit.
 
 ### Display Features
 **Top Section:** Device ID (from /dev/disk/by-id) and the number of days of log info being displayed.
@@ -214,7 +215,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now nvme_mon
 ```
 
-## Overview of Installation Layout
+### Overview of Installation Layout
 
 ```
 /opt/nvme_mon/               ← application
