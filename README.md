@@ -37,7 +37,7 @@ pyenv virtualenv 3.14 nvme-mon
 pyenv activate nvme-mon
 ```
 
-## SMART Data Collection Service Installation
+## SMART Data Collection Service
 
 ### Install Monitor/Collection Script
 ```bash
@@ -79,7 +79,7 @@ pyenv activate nvme-mon
 pip install -r requireements.txt
 ```
 
-### Run the Client in the Foreground
+### OPTION 1: Run the Client in the Foreground
 ```bash
 cd nvme-mon
 pyenv activate nvme-mon
@@ -109,7 +109,7 @@ The app will automatically discover all NVME devices and collect SMART statistic
 
 **Temperature Histograms:** Shows the number of records found for each temperature value, and the date and (optionally) time of the last reading for each temperature
 
-### Install and Run the Email Alert Background Service
+### OPTION 2: Run the Client as a Background EMail ALert Service
 
 #### Create a Service User
 
