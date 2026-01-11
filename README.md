@@ -2,11 +2,11 @@
 
 A Linux/Python application that monitors the health of all installed NVME SSDs. The application consists of two components:
 
-- A **script that is installed as a Linux service**. It periodically collects SMART data from the installed disks and writes it to a log file.
+- **SMART Data Collection Service**:  A **script** that is installed as a Linux service**. It periodically collects SMART data from the installed disks and writes it to a log file.
 
-- A **python command-line application** that reads the SMART data log file and displays current disk health info and a historical summary of disk temperatures. It also **sends email alert messages** when health info values exceed configured thresholds.
-  - Run the client in the foreground, OR
-  - Run it in headless mode as a service. This provides continuous background disk monitoring, with email alerts
+- **Command Line Client**: A **python application** that reads the SMART data log file and displays current disk health info and a historical summary of disk temperatures. It also **sends email alert messages** when health info values exceed configured thresholds.
+  - Run the client in the **foreground**, OR
+  - Run it in headless mode as **a service**. This provides continuous background disk monitoring, with email alerts
 
 <img width="1200" height="673" alt="image" src="https://github.com/user-attachments/assets/0ba49e84-82af-4f63-a9fa-e39e1f6c16e9" />
 
