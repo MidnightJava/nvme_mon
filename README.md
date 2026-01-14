@@ -47,21 +47,7 @@ sudo cp nvme_collector.py /usr/local/bin/nvme_collector.py
 
 ### Create the Service Configuration
 ```bash
-sudo tee /etc/systemd/system/nvme-collector.service > /dev/null <<'EOF'
-[Unit]
-Description=NVME SMART Data Collection Daemon
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 /usr/local/bin/nvme_collector.py
-Restart=always
-RestartSec=10
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOF
+./install_collector_service.sh
 ```
 
 ### Enable and Start the Collection Service
