@@ -47,7 +47,7 @@ sudo cp nvme_monitor.py /usr/local/bin/nvme_monitor.py
 
 ### Create the Service Configuration
 ```bash
-cat << EOF | sudo tee /etc/systemd/system/nmve-monitor.service > /dev/null
+cat < EOF | sudo tee /etc/systemd/system/nmve-monitor.service > /dev/null
 [Unit]
 Description=NVME SMART Data Collection Daemon
 After=network.target
@@ -140,7 +140,7 @@ sudo chmod 700 /var/lib/nvme_mon
 
 #### Create the Service Configuration
 ```bash
-cat << EOF | sudo tee /etc/systemd/system/nvme-mon.service > /dev/null
+cat < EOF | sudo tee /etc/systemd/system/nvme-mon.service > /dev/null
 [Unit]
 Description=NVMe Health Reporting Daemon
 After=network-online.target
