@@ -47,7 +47,7 @@ sudo cp nvme_collector.py /usr/local/bin/nvme_collector.py
 
 ### Create the Service Configuration
 ```bash
-cat << EOF | sudo tee /etc/systemd/system/nmve-collector.service > /dev/null
+sudo tee /etc/systemd/system/nvme-collector.service > /dev/null <<'EOF'
 [Unit]
 Description=NVME SMART Data Collection Daemon
 After=network.target
