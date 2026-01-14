@@ -39,22 +39,22 @@ pyenv activate nvme-mon
 
 ## SMART Data Collection Service
 
-### Install Monitor/Collection Script
-```bash
+### Install NVME Collector Script
 cd nvme-mon
-sudo cp nvme_monitor.py /usr/local/bin/nvme_monitor.py
+```bash
+sudo cp nvme_collector.py /usr/local/bin/nvme_collector.py
 ```
 
 ### Create the Service Configuration
 ```bash
-cat << EOF | sudo tee /etc/systemd/system/nmve-monitor.service > /dev/null
+cat << EOF | sudo tee /etc/systemd/system/nmve-collector.service > /dev/null
 [Unit]
 Description=NVME SMART Data Collection Daemon
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /usr/local/bin/nvme_monitor.py
+ExecStart=/usr/bin/python3 /usr/local/bin/nvme_collector.py
 Restart=always
 RestartSec=10
 User=root
@@ -67,7 +67,7 @@ EOF
 ### Enable and Start the Collection Service
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now nvme-monitor
+sudo systemctl enable --now nvme-collector
 ```
 
 ## Command Line Client
