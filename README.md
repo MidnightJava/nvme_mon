@@ -39,22 +39,29 @@ pyenv activate nvme-mon
 
 ## SMART Data Collection Service
 
-### Install NVME Collector Script
-cd nvme-mon
-```bash
-sudo cp nvme_collector.py /usr/local/bin/nvme_collector.py
+### Install and Run the NVME Collector
+Run the script below in a python virtual environment
 ```
+./build_install_collector.sh
+```
+This script compiles the collector python script into a single executable file and installs it as a systemd service
+**Service Config File**: /etc/systemd/system/nvme_collector.service
+**Service Executable**: /opt/nvme_collector/nvme_collector (sym-linked to /usr/local/bin/nvme_collector)
+**Environment File**: /etc/nvme_collector/env.conf
+**Service Management**: sudo systemctl enable|start|stop|status nvme_collector
 
-### Create the Service Configuration
-```bash
-./install_collector_service.sh
-```
+The service runs as root, which is required to invoke the nvme-cli API.
 
-### Enable and Start the Collection Service
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now nvme-collector
-```
+### SMART Data Logs
+**Log Directory**: /var/log/nvme_mon
+
+**nvme_health.json**: SMART data records written at the configured collection interval (env var COLLECTION_INTERVAL). The command line client and the NVME reporter service read this file. The file is periodically pruned to remove and archive old records, as explained below.
+
+**nvme_health_readable.log**: Human-readable log written at the configured interval, containing a subset of the fields written to the json file. Records from this file are NOT archived.
+
+**log_archive.json**: At the configured archive interval (env var ARCHIVE_INTERVAL), the *nvme_health.json* file is trimmed in accordance with configured maximum record age (env var MAX_RECORD_AGE). Possibile values are defined by the [pytimeparse](https://pypi.org/project/pytimeparse/) library. (e.g, 30d, 5w, 6m). Old records are appended to *log_archive.json*.
+
+The *nvme_health.json* file is pruned to provide a reasonable data set for the command line client. Since the *nvme_health_readable.log* and *log_archive.json* files may grow arbitrarily large, a log rotation scheme should be enable for these files, for example using the [logrotate](https://linux.die.net/man/8/logrotate) Linux capability.
 
 ## Command Line Client
 
