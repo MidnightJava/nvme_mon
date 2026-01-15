@@ -2,9 +2,9 @@
 
 A Linux/Python application that monitors the health of all installed NVME SSDs. The application consists of two components:
 
-- **SMART Data Collection Service**:  A **script** that is installed as a Linux service**. It periodically collects SMART data from the installed disks and writes it to a log file.
+- **SMART Data Collection Service**:  A script that is installed as a Linux service. It periodically collects SMART data from the installed disks and writes data records to a log file.
 
-- **Command Line Client**: A **python application** that reads the SMART data log file and displays current disk health info and a historical summary of disk temperatures. It also **sends email alert messages** when health info values exceed configured thresholds.
+- **Command Line Client**: A python application that reads the SMART data log file and displays current disk health info and a historical summary of disk temperatures. It also **sends email alert messages** when health info values exceed configured thresholds.
   - Run the client in the **foreground**, OR
   - Run it in headless mode as **a service**. This provides continuous background disk monitoring, with email alerts
 
@@ -27,7 +27,7 @@ sudo dnf update
 sudo dnf install nvme-cli
 ```
 
-### Python Virtual Environment (optional)
+### Python Virtual Environment (for [PEP 668](https://peps.python.org/pep-0668/) compatibility)
 * Install [PyEnv](https://github.com/pyenv/pyenv) or any other python virtual environment package
 * Commands below work with PyEnv:
 ```bash
@@ -44,10 +44,14 @@ Run the script below in a python virtual environment
 ```
 ./build_install_collector.sh
 ```
-This script compiles the collector python script into a single executable file and installs it as a systemd service
+This script compiles the SMART data collector into a single executable file and installs it as a systemd service
+
 **Service Config File**: /etc/systemd/system/nvme_collector.service
-**Service Executable**: /opt/nvme_collector/nvme_collector (sym-linked to /usr/local/bin/nvme_collector)
+
+**Service Executable**: /usr/local/bin/nvme_collector (sym link pointing to /opt/nvme_collector/nvme_collector)
+
 **Environment File**: /etc/nvme_collector/env.conf
+
 **Service Management**: sudo systemctl enable|start|stop|status nvme_collector
 
 The service runs as root, which is required to invoke the nvme-cli API.
@@ -59,9 +63,9 @@ The service runs as root, which is required to invoke the nvme-cli API.
 
 **nvme_health_readable.log**: Human-readable log written at the configured interval, containing a subset of the fields written to the json file. Records from this file are NOT archived.
 
-**log_archive.json**: At the configured archive interval (env var ARCHIVE_INTERVAL), the *nvme_health.json* file is trimmed in accordance with configured maximum record age (env var MAX_RECORD_AGE). Possibile values are defined by the [pytimeparse](https://pypi.org/project/pytimeparse/) library. (e.g, 30d, 5w, 6m). Old records are appended to *log_archive.json*.
+**log_archive.json**: At the configured archive interval (env var ARCHIVE_INTERVAL), the `nvme_health.json` file is trimmed in accordance with the configured maximum record age (env var MAX_RECORD_AGE). Possibile variable values are defined by the [pytimeparse](https://pypi.org/project/pytimeparse/) library. (e.g, 30d, 5w, 6m). Old records removed from `nvme_health.json` are appended to `log_archive.json`.
 
-The *nvme_health.json* file is pruned to provide a reasonable data set for the command line client. Since the *nvme_health_readable.log* and *log_archive.json* files may grow arbitrarily large, a log rotation scheme should be enable for these files, for example using the [logrotate](https://linux.die.net/man/8/logrotate) Linux capability.
+**Log Pruning**: The `nvme_health.json` file is pruned to provide a reasonable data set for the command line client. Since the `nvme_health_readable.log` and `log_archive.json` files are not pruned and may grow arbitrarily large, a log rotation scheme should be implemented for these files, for example using the [logrotate](https://linux.die.net/man/8/logrotate) Linux capability.
 
 ## Command Line Client
 
