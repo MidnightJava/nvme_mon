@@ -16,4 +16,4 @@ alert_settings:
     # maximum number of emails that can be sent per hour (default 20)
     rate_limit: 20
 
-LOG_FILE_NAME: /var/log/nvme_health.json
+LOG_FILE_NAME: /var/log/nvme_mon/nvme_health.json

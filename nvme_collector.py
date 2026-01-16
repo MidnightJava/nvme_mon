@@ -6,68 +6,63 @@ import os
 import re
 import subprocess
 import time
-from datetime import datetime
+import pwd, grp
+import tempfile
+from datetime import datetime, timedelta
+from pytimeparse import parse
 from statistics import mean
 
-LOG_JSON = "/var/log/nvme_health.json"
-LOG_HUMAN = "/var/log/nvme_health_readable.log"
+LOG_DIR = "/var/log/nvme_mon"
+
+LOG_JSON = os.path.join(LOG_DIR, "nvme_health.json")
+LOG_HUMAN = os.path.join(LOG_DIR, "nvme_health_readable.log")
+LOG_JSON_ARCHIVE = os.path.join(LOG_DIR, "log_archive.json")
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+DEFAULT_COLLECTION_INTERVAL = 5 * 60  # 5 minutes
+COLLECTION_INTERVAL = int(os.environ.get("COLLECTION_INTERVAL", DEFAULT_COLLECTION_INTERVAL))
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+MAX_RECORD_AGE = ""
+DEFAULT_ARCHIVE_INTERVAL = 60 * 60 * 24  # 1 day
+ARCHIVE_INTERVAL_SEC =int(os.environ.get("ARCHIVE_INTERVAL", DEFAULT_ARCHIVE_INTERVAL))
 
+LOG_LEVELS = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+}
 
+log_level = LOG_LEVELS[os.environ.get("LOG_LEVEL", "warning").lower()]
 # -----------------------------
 # Logging Setup
 # -----------------------------
 def setup_logging():
-    os.makedirs("/var/log", exist_ok=True)
+    os.makedirs(LOG_DIR, exist_ok=True)
+    os.chown(LOG_DIR, uid=pwd.getpwnam("root").pw_uid, gid=grp.getgrnam("nvme_mon").gr_gid)
+    os.chmod(LOG_DIR, 0o777)
 
     # Main namespace logger
     root_logger = logging.getLogger("nvme_monitor")
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(log_level)
     root_logger.propagate = False
 
     # Strip handlers if systemd already added a journald handler
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
 
-    # JSON handler
-    json_handler = logging.FileHandler(LOG_JSON)
-    json_handler.setLevel(logging.INFO)
-    json_handler.setFormatter(logging.Formatter("%(message)s"))
-
-    # Human readable handler
-    human_handler = logging.FileHandler(LOG_HUMAN)
-    human_handler.setLevel(logging.INFO)
-    human_handler.setFormatter(logging.Formatter(
-        "%(asctime)s [%(levelname)s] %(message)s"
-    ))
-
     # Console handler (systemd)
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(log_level)
     console_handler.setFormatter(logging.Formatter(
         "%(asctime)s [%(levelname)s] %(message)s"
     ))
 
     # Attach console to the main logger
     root_logger.addHandler(console_handler)
+    return root_logger
 
-    # Sub-loggers for JSON and human-readable
-    json_logger = logging.getLogger("nvme_monitor.json")
-    json_logger.setLevel(logging.INFO)
-    json_logger.propagate = False
-    json_logger.addHandler(json_handler)
-
-    human_logger = logging.getLogger("nvme_monitor.human")
-    human_logger.setLevel(logging.INFO)
-    human_logger.propagate = False
-    human_logger.addHandler(human_handler)
-
-    return json_logger, human_logger, root_logger
-
-
-json_logger, human_logger, root_logger = setup_logging()
-
+log = setup_logging()
 
 # -----------------------------
 # NVMe Discovery
@@ -126,7 +121,7 @@ def run_nvme_json(args):
         )
         return json.loads(result.stdout)
     except Exception as e:
-        root_logger.error(f"Failed to run {' '.join(cmd)}: {e}")
+        log.error(f"Failed to run {' '.join(cmd)}: {e}")
         return None
 
 
@@ -215,16 +210,16 @@ def extract_health(device, id_ctrl, smart):
 # -----------------------------
 # Monitoring Loop
 # -----------------------------
-def monitor(interval=60*5):
-    root_logger.info("NVMe monitoring daemon starting...")
+def monitor(interval=COLLECTION_INTERVAL):
+    log.info("NVMe monitoring daemon starting...")
 
     while True:
         devices = discover_nvme_devices()
 
         if not devices:
-            root_logger.warning("No NVMe devices found.")
+            log.warning("No NVMe devices found.")
         else:
-            root_logger.info(f"Discovered devices: {devices}")
+            log.debug(f"Discovered devices: {devices}")
 
         for dev in devices:
             idc = read_id_ctrl(dev)
@@ -232,23 +227,57 @@ def monitor(interval=60*5):
 
             health = extract_health(dev, idc, smart)
             if not health:
-                root_logger.error(f"Failed to extract health for {dev}")
+                log.error(f"Failed to extract health for {dev}")
                 continue
 
             # Write JSON
-            json_logger.info(json.dumps(health))
+            with open(LOG_JSON, "a") as json_log_file:
+                json_log_file.write(json.dumps(health) + "\n")
 
             # Write human log
-            human_logger.info(
-                f"{dev}: {health['temperature_c']:.1f}°C, "
-                f"{health['percentage_used']}% used, "
-                f"{health['media_errors']} media errors "
-                f"health score: {health['health_score']}"
-            )
+            with open(LOG_HUMAN, "a") as human_log_file:
+                human_log_file.write(
+                    f"{dev}: {health['temperature_c']:.1f}°C, "
+                    f"{health['percentage_used']}% used, "
+                    f"{health['media_errors']} media errors "
+                    f"health score: {health['health_score']}"
+                    "\n"
+                )
 
         time.sleep(interval)
 
+from threading import Timer
+
+def repeat_function(interval, func, *args, **kwargs):
+    def wrapper():
+        func(*args, **kwargs)
+        Timer(interval, wrapper).start()
+    Timer(interval, wrapper).start()
+
+def prune_log_file():
+    log.debug("Pruning log file...")
+    count = 0
+    with tempfile.NamedTemporaryFile(mode="w+t") as temp:
+        with open(LOG_JSON, "r") as in_file:
+            with open(LOG_JSON_ARCHIVE, "a") as archive:
+                for line in in_file:
+                    obj = json.loads(line)
+                    date_time = datetime.strptime(obj['timestamp'], DATE_FORMAT)
+                    max_age = timedelta(seconds=parse(MAX_RECORD_AGE))
+                    if (datetime.now() - date_time).total_seconds() > max_age.total_seconds():
+                        count += 1
+                        archive.write(line)
+                    else:
+                        temp.write(line)
+        if count > 0:
+            try:
+                os.rename(temp.name, LOG_JSON)
+                log.info(f"Wrote {count} old records to archive.")
+            except PermissionError:
+                log.error(f"Permission denied while archiving file {LOG_JSON}")
 
 if __name__ == "__main__":
+    log.debug("Starting NVMe Monitor...")
+    repeat_function(ARCHIVE_INTERVAL_SEC, prune_log_file)   
     monitor()
 

@@ -22,7 +22,18 @@ from nvme_mon.paths import resource_path
 from dotenv import load_dotenv
 if not is_frozen(): load_dotenv()
 
+LOG_LEVELS = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+}
+
+log_level = LOG_LEVELS[os.environ.get("LOG_LEVEL", "warning").lower()]
+# -----------------------------
+
 log = logging.getLogger(__name__)
+log.setLevel(log_level)
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 REFRESH_INTERVAL_SEC = 300
@@ -151,8 +162,10 @@ class NvmeMon:
     def parse_log_file(self):
         self.devices = defaultdict(device_record)
         self.temp_records = defaultdict(list)
+        log_record_found = False
         with open(self.log_file, 'r') as f:
             for line in f:
+                # log_record_found = True
                 record = json.loads(line)
                 device = record["device"]
                 histo_entry = self.devices[device]["histogram"][record["mean_temperature"]]
@@ -166,6 +179,8 @@ class NvmeMon:
                 self.devices[device]["health_info"] = self.get_health_info(record)
             for device in self.devices.keys():
                 self.devices[device]["temp_info"] = self.get_temp_info(device, self.temp_records[device])
+        if not log_record_found:
+            log.warning("No log records found")
 
     def get_temp_info(self, device, temp_records):
         start_date = sorted(temp_records, key=attrgetter('datetime'))[0]
@@ -246,7 +261,7 @@ class NvmeMon:
     def display_info(self):
         current_device = None
         for device in self.get_devices():
-            # clear_screen()
+            clear_screen()
             if current_device is not None and device != current_device:
                 continue
             current_device = None
@@ -294,6 +309,7 @@ class NvmeMon:
             if not self.email_settings_ok():
                 render_styled_text("EMail alerts are enabled, but one or more of the required environment variables is not set", "bold red")
             
+            # Blocks until key is pressed or interval elapses
             key = getkey(REFRESH_INTERVAL_SEC)
             if key is None:
                 if self.alerts_enabled:
