@@ -130,20 +130,28 @@ This script compiles the EMAil reporter into a single executable file and instal
 The service runs under the system account nvme_reporter, which has no login shell
 
 ### Overview of Installation Layout
-
+Collector Service
 ```
-/opt/nvme_mon/               ← application
+/opt/nvme_collector/               ← application
 │
-├── nvme_mon                 ← executable
+├── nvme_collector                 ← executable
+
+/etc/nvme_collector/
+└── env.conf             ← environment variables
+```
+
+EMail ALert Service
+```
+/opt/nvme_reporter/               ← application
+│
+├── nvme_reporter                 ← executable
 ├── _internal/
-├── lib-dynload/
-└── base_library.zip
 
-/etc/nvme_mon/
+/etc/nvme_reporter/
 ├── config.yaml              ← app config
-└── nvme_mon.env             ← environment variables
+└── env.conf             ← environment variables
 
-/var/lib/nvme_mon/
+/var/lib/nvme_reporter/
 └── .last_alert              ← runtime state
 ```
 
