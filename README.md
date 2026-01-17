@@ -129,7 +129,7 @@ This script compiles the EMAil reporter into a single executable file and instal
 
 The service runs under the system account nvme_reporter, which has no login shell
 
-### Overview of Installation Layout
+## Overview of Installation Layout
 Collector Service
 ```
 /opt/nvme_collector/               ← application
