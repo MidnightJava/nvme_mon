@@ -165,7 +165,7 @@ class NvmeMon:
         log_record_found = False
         with open(self.log_file, 'r') as f:
             for line in f:
-                # log_record_found = True
+                log_record_found = True
                 record = json.loads(line)
                 device = record["device"]
                 histo_entry = self.devices[device]["histogram"][record["mean_temperature"]]

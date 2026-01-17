@@ -44,12 +44,16 @@ class AlertManager:
         lines =[]
         try:
             with open(app_data_path(LAST_ALERT_FILENAME), "r") as f:
-                history = defaultdict(lambda: defaultdict(history_record), json.load(f))
+                raw = json.load(f)
+                history = defaultdict(lambda: defaultdict(history_record))
+                for device, data in raw.items():
+                    history[device] = defaultdict(history_record, data)
         except FileNotFoundError:
                 history = defaultdict(lambda: defaultdict(history_record))
-        history_orig = history.copy()
+        threshhold_exceeded = False
         for k,v in health_info.items():
             if k in compare_func and compare_func[k](v, self.thresholds[k]):
+                threshhold_exceeded = True
                 log.debug(f'Considering alert for {k}')
                 last_alert = history[device_name][k]["timestamp"]
                 if last_alert is not None:
@@ -63,8 +67,20 @@ class AlertManager:
                     lines.append(f"{k} = {v}. Configured threshold is {self.thresholds[k]}.")
                     history[device_name][k]["last_value"] = v
                     history[device_name][k]["timestamp"] = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        if not lines and threshhold_exceeded and self.settings.get("notify_when_healthy", "false"):
+            k = "notify_when_healthy"
+            last_alert = history[device_name].get(k, defaultdict(history_record)).get("timestamp", None)
+            if last_alert is not None:
+                last_alert_time = datetime.strptime(last_alert, "%Y-%m-%d %H:%M:%S")
+            else:
+                last_alert_time = None
+            if last_alert_time is None or \
+                (datetime.now() - last_alert_time).total_seconds() > alert_interval.total_seconds():
+                    lines.append("The disk is healthy. All SMART data values are within the configured threshholds.")
+                    history[device_name][k]["timestamp"] = current_time.strftime("%Y-%m-%d %H:%M:%S")
         if lines:
-            lines.insert(0, f"The following SMART data values are beyond their configured threshold:\n")
+            if not lines[0].startswith("The disk is healthy"):
+                lines.insert(0, "The following SMART data values are beyond their configured threshold:\n")
             lines.append(f"\nDevice: {device_name}")
             log.debug('Calling send_email')
             with open(app_data_path(LAST_ALERT_FILENAME), "w") as f:

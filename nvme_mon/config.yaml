@@ -3,7 +3,7 @@
 
 alert_thresholds:
     num_err_log_entries: 0
-    unsafe_shutdowns: 0
+    unsafe_shutdowns: 20
     percentage_used: 50
     media_errors: 0
     health_score: 90
@@ -12,8 +12,11 @@ alert_thresholds:
 alert_settings:
     alerts_enabled: true
     # See https://pypi.org/project/pytimeparse/ for possible values
-    alert_interval: 1w # This regex is probably all you need: \d+m|\d+h|\d+d|\d+w
+    # (This regex is probably all you need: \d+\s*[wdhm])
+    alert_interval: 1w 
     # maximum number of emails that can be sent per hour (default 20)
     rate_limit: 20
+    # Send a "healthy" notification when alert interval is reached and there are no alerts
+    notify_when_healthy: true
 
 LOG_FILE_NAME: /var/log/nvme_mon/nvme_health.json
