@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-import os, sys, tty, termios, select
-from os import path
+import os, sys, tty, termios
 from pathlib import Path
 from collections import namedtuple, defaultdict
 from datetime import datetime
@@ -9,12 +8,14 @@ from statistics import mean, median
 import json
 from itertools import cycle
 import time
+from datetime import timedelta
+from pytimeparse import parse
 import fcntl
 import yaml
 import logging
 from nvme_mon.paths import is_frozen
 
-from nvme_mon.alert_manager import AlertManager
+from nvme_mon.alert_manager import AlertManager, DATE_FORMAT
 from nvme_mon.rich_ui import YELLOW_THRESHOLD, RED_THRESHOLD, \
     print_general_info, print_disk_info, print_histogram, render_prompt_text, render_styled_text
 from nvme_mon.paths import resource_path
@@ -34,7 +35,6 @@ log_level = LOG_LEVELS[os.environ.get("LOG_LEVEL", "warning").lower()]
 
 log = logging.getLogger(__name__)
 log.setLevel(log_level)
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 REFRESH_INTERVAL_SEC = 300
 
@@ -154,8 +154,11 @@ class NvmeMon:
             sys.exit(0)
 
         self.parse_log_file()
-        if headless: # headless modeget_config
-            self.run_alert_loop()
+        if headless: # headless mode
+            if not self.email_settings_ok():
+                log.error("EMail alerts are enabled, but one or more of the required environment variables is not set")
+            else:
+                self.run_alert_loop()
         else: # interactive mode
             self.display_info()
 
@@ -234,10 +237,22 @@ class NvmeMon:
     def run_alert_loop(self):
         log.debug('Running alert loop')
         while True:
+            self.parse_log_file()
             for device in self.devices.values():
                 self.check_alerts(device)
+            self.check_log_data()
             time.sleep(REFRESH_INTERVAL_SEC)
-    
+
+    def check_log_data(self):
+        settings = self.get_config()['alert_settings']
+        max_data_interval = settings.get('notify_no_data_after', None)
+        if not max_data_interval: return
+        max_delta = timedelta(seconds=parse(max_data_interval))
+        for disk, sample_time in self.last_sample_time.items():
+            if (datetime.now() - sample_time).total_seconds() > max_delta.total_seconds():
+                print(f"stale data for {disk}")
+                self.alert_manager.send_data_stalled_message(sample_time, os.path.basename(disk))
+
     def check_alerts(self, device):
         thresholds = self.get_config()['alert_thresholds']
         settings = self.get_config()['alert_settings']
@@ -349,6 +364,7 @@ class NvmeMon:
                 sys.exit(0)
             else:
                 current_device = device
+            self.parse_log_file()
 
 def main():
     log.debug("argv = %r", sys.argv)

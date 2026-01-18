@@ -18,5 +18,9 @@ alert_settings:
     rate_limit: 20
     # Send a "healthy" notification when alert interval is reached and there are no alerts
     notify_when_healthy: true
+    # Send an email alert if no new collection log record is found in the specified time period
+    # Specify the time period in accordance wtih pytimeparse
+    # Delete the entry or leave the value empty to omit this check
+    notify_no_data_after: 4h
 
 LOG_FILE_NAME: /var/log/nvme_mon/nvme_health.json

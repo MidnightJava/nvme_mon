@@ -27,6 +27,7 @@ fi
 # Install the application files
 sudo systemctl stop nvme-reporter.service || true
 sudo mkdir -p /opt/nvme_reporter
+sudo systemctl stop nvme_reporter.service || true
 sudo cp -r dist/nvme_reporter/* /opt/nvme_reporter/
 sudo ln -sf /opt/nvme_reporter/nvme_reporter /usr/local/bin/nvme_reporter
 sudo chown -R root:root /opt/nvme_reporter
@@ -84,6 +85,5 @@ EOF
 
 # Enable and start the service
 sudo systemctl daemon-reload
-sudo systemctl stop nvme_reporter.service || true
 sudo systemctl enable --now nvme_reporter.service
 sudo systemctl status nvme_reporter.service

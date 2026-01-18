@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from time import strftime
 from pytimeparse import parse
 from pathlib import Path
 from os import path
@@ -6,11 +7,12 @@ from collections import defaultdict
 import json
 import logging
 from throttled import exceptions
-
 from nvme_mon.email_sender import EmailSender
 from nvme_mon.paths import app_data_path
 
 log = logging.getLogger(__name__)
+
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 LAST_ALERT_FILENAME = ".last_alert"
 
@@ -67,9 +69,9 @@ class AlertManager:
                     lines.append(f"{k} = {v}. Configured threshold is {self.thresholds[k]}.")
                     history[device_name][k]["last_value"] = v
                     history[device_name][k]["timestamp"] = current_time.strftime("%Y-%m-%d %H:%M:%S")
-        if not lines and threshhold_exceeded and self.settings.get("notify_when_healthy", "false"):
+        if not lines and not threshhold_exceeded and self.settings.get("notify_when_healthy", "false"):
             k = "notify_when_healthy"
-            last_alert = history[device_name].get(k, defaultdict(history_record)).get("timestamp", None)
+            last_alert = history[device_name][k]["timestamp"]
             if last_alert is not None:
                 last_alert_time = datetime.strptime(last_alert, "%Y-%m-%d %H:%M:%S")
             else:
@@ -94,6 +96,37 @@ class AlertManager:
                     log.info(f"Error sending email: {e}")
                     json.dump(history, f)
 
+    def send_data_stalled_message(self, last_sample_time, device_name):
+        try:
+            with open(app_data_path(LAST_ALERT_FILENAME), "r") as f:
+                raw = json.load(f)
+                history = defaultdict(lambda: defaultdict(history_record))
+                for device, data in raw.items():
+                    history[device] = defaultdict(history_record, data)
+        except FileNotFoundError:
+                history = defaultdict(lambda: defaultdict(history_record))
+        last_alerts = []
+        tstamp = history[device_name]['stalled_data']['timestamp']
+        if tstamp: last_alerts.append(tstamp)
+        if last_alerts:
+            last_alert_time =  datetime.strptime(max(last_alerts), DATE_FORMAT)
+        else:
+            last_alert_time = None
+        interval = self.settings["alert_interval"]
+        alert_interval = timedelta(seconds=parse(interval))
+        if last_alert_time is None or (datetime.now() - last_alert_time).total_seconds() > alert_interval.total_seconds():
+            lines = [
+                f"The SMART log collector may be stalled. The timestanp of the latest log record is {last_sample_time.strftime(DATE_FORMAT)}",
+                f"\nDevice: {device_name}"
+            ]
+            self.sender.send_email(
+                subject=f"SMART Data Alert",
+                body="\n".join(lines),
+                timeout=5)
+            history[device_name]['stalled_data']['timestamp'] = datetime.now().strftime(DATE_FORMAT)
+            with open(app_data_path(LAST_ALERT_FILENAME), "w") as f:
+                json.dump(history, f)
+        
     def send_test_email(self):
         self.sender.send_email(
             subject=f"SMART Data Alert Test",
