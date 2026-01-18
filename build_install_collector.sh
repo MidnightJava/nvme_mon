@@ -19,6 +19,7 @@ sudo ln -sf /opt/nvme_collector/nvme_collector /usr/local/bin/nvme_collector
 sudo tee /etc/nvme_collector/env.conf > /dev/null <<'EOF'
 LOG_LEVEL=info
 COLLECTION_INTERVAL=300
+MAX_RECORD_AGE: 30 days
 # One day
 ARCHIVE_INTERVAL=86400
 EOF
