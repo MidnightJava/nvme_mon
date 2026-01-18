@@ -44,6 +44,5 @@ EOF
 
 Enable and start the service
 sudo systemctl daemon-reload
-sudo systemctl stop nvme_collector.service || true
 sudo systemctl enable --now nvme_collector.service
 sudo systemctl status nvme_collector.service
