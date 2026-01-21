@@ -44,7 +44,7 @@ Run the command below in a python virtual environment.
 ```
 ./build_install_collector.sh
 ```
-This script compiles the SMART data collector into a single executable file and installs it as a systemd service.
+This script compiles the SMART data collector into a single executable file and installs it as a systemd service. Modify environment variables in the script as desired, for collection interval and management of the collection log files.
 
 **Service Config File**: /etc/systemd/system/nvme_collector.service
 
