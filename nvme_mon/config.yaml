@@ -13,7 +13,8 @@ alert_settings:
     alerts_enabled: true
     # See https://pypi.org/project/pytimeparse/ for possible values
     # (This regex is probably all you need: \d+\s*[wdhm])
-    alert_interval: 1w 
+    # Do not repeat alerts previously sent untio this interval passes
+    alert_interval: 1w
     # maximum number of emails that can be sent per hour (default 20)
     rate_limit: 20
     # Send a "healthy" notification when alert interval is reached and there are no alerts

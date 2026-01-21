@@ -3,6 +3,7 @@ import glob
 import json
 import logging
 import os
+import shutil
 import re
 import subprocess
 import time
@@ -273,12 +274,14 @@ def prune_log_file():
         if count > 0:
             try:
                 os.rename(temp.name, LOG_JSON)
+                shutil.chown(LOG_JSON, uid=pwd.getpwnam("root").pw_uid, gid=grp.getgrnam("nvme_mon").gr_gid)
+                os.chmod(LOG_JSON, 0o666)
                 log.info(f"Wrote {count} old records to archive.")
             except PermissionError:
                 log.error(f"Permission denied while archiving file {LOG_JSON}")
 
 if __name__ == "__main__":
     log.debug("Starting NVMe Monitor...")
-    repeat_function(ARCHIVE_INTERVAL_SEC, prune_log_file)   
+    repeat_function(ARCHIVE_INTERVAL_SEC, prune_log_file)
     monitor()
 
