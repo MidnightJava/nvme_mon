@@ -41,8 +41,6 @@ log_level = LOG_LEVELS[os.environ.get("LOG_LEVEL", "warning").lower()]
 # -----------------------------
 def setup_logging():
     os.makedirs(LOG_DIR, exist_ok=True)
-    os.chown(LOG_DIR, uid=pwd.getpwnam("root").pw_uid, gid=grp.getgrnam("nvme_mon").gr_gid)
-    os.chmod(LOG_DIR, 0o777)
 
     # Main namespace logger
     root_logger = logging.getLogger("nvme_monitor")
@@ -113,7 +111,8 @@ def run_nvme_json(args):
     Run an nvme CLI command and parse json output.
     args: list like ["id-ctrl", "/dev/..."]
     """
-    cmd = ["nvme"] + args + ["-o", "json"]
+    nvme_bin = shutil.which("nvme")  # auto-detects path
+    cmd = ["sudo", nvme_bin] + args + ["-o", "json"]
     try:
         result = subprocess.run(
             cmd,
@@ -274,8 +273,8 @@ def prune_log_file():
         if count > 0:
             try:
                 os.rename(temp.name, LOG_JSON)
-                shutil.chown(LOG_JSON, uid=pwd.getpwnam("root").pw_uid, gid=grp.getgrnam("nvme_mon").gr_gid)
-                os.chmod(LOG_JSON, 0o666)
+                shutil.chown(LOG_JSON, uid="nvme_mon", gid="nvme_mon")
+                os.chmod(LOG_JSON, 0o766)
                 log.info(f"Wrote {count} old records to archive.")
             except PermissionError:
                 log.error(f"Permission denied while archiving file {LOG_JSON}")
