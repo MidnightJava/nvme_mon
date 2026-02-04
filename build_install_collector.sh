@@ -12,9 +12,10 @@ pyinstaller --onefile --distpath ./dist --name nvme_collector --clean --noconfir
 sudo mkdir -p /etc/nvme_collector
 sudo mkdir -p /opt/nvme_collector
 sudo mkdir -p /var/log/nvme_mon
-# The nvme-cli commands need to run as root, but the service is running as user nvme_mon, to keep log files non-root reaable.
-# The following code allows the nvme_mon user to run the nvme-cli *read-only* commands as root, without entering a password.
-# To revoke this access later, delete /etc/sudoers.d/nvme-mon
+# The nvme-cli commands need to be run as root, but the service is running as user nvme_mon, to keep log files non-root
+# reaable. We create a sudoers drop-in file that allows the nvme_mon user to run the nvme-cli *read-only* commands
+# as root, without entering a password.
+# To revoke this access later, delete /etc/sudoers.d/nvme-mon.
 NVME_BIN=$(sudo which nvme) && sudo tee /etc/sudoers.d/nvme-mon <<EOF
 Cmnd_Alias NVME_SAFE_CMDS = $NVME_BIN smart-log *, \\
                             $NVME_BIN id-ctrl *, \\
