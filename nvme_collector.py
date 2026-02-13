@@ -12,6 +12,7 @@ import tempfile
 from datetime import datetime, timedelta
 from pytimeparse import parse
 from statistics import mean
+from systemd.journal import JournalHandler
 
 LOG_DIR = "/var/log/nvme_mon"
 
@@ -42,27 +43,35 @@ log_level = LOG_LEVELS[os.environ.get("LOG_LEVEL", "warning").lower()]
 def setup_logging():
     os.makedirs(LOG_DIR, exist_ok=True)
 
-    # Main namespace logger
     root_logger = logging.getLogger("nvme_monitor")
     root_logger.setLevel(log_level)
     root_logger.propagate = False
 
-    # Strip handlers if systemd already added a journald handler
+    # Optional: clear any stray handlers (still fine)
     if root_logger.hasHandlers():
         root_logger.handlers.clear()
 
-    # Console handler (systemd)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(log_level)
-    console_handler.setFormatter(logging.Formatter(
+    # Journald handler – this is the key change
+    journal_handler = JournalHandler()
+    journal_handler.setLevel(log_level)
+    journal_handler.setFormatter(logging.Formatter(
         "%(asctime)s [%(levelname)s] %(message)s"
     ))
+    root_logger.addHandler(journal_handler)
 
-    # Attach console to the main logger
-    root_logger.addHandler(console_handler)
+    # Optional: keep a console handler for local testing (when not under systemd)
+    if os.environ.get("RUNNING_UNDER_SYSTEMD", "0") != "1":  # or detect !sys.stdout.isatty()
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level)
+        console_handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(message)s"
+        ))
+        root_logger.addHandler(console_handler)
+        
     return root_logger
 
 log = setup_logging()
+
 
 # -----------------------------
 # NVMe Discovery
@@ -111,8 +120,8 @@ def run_nvme_json(args):
     Run an nvme CLI command and parse json output.
     args: list like ["id-ctrl", "/dev/..."]
     """
-    nvme_bin = shutil.which("nvme")  # auto-detects path
-    cmd = ["sudo", nvme_bin] + args + ["-o", "json"]
+    nvme_bin = "/usr/local/bin/nvme_mon_cli"  # Restricted binary creaed in our build script that only allows safe read-only commands
+    cmd = [nvme_bin] + args + ["-o", "json"]
     try:
         result = subprocess.run(
             cmd,
@@ -273,7 +282,7 @@ def prune_log_file():
         if count > 0:
             try:
                 os.rename(temp.name, LOG_JSON)
-                shutil.chown(LOG_JSON, uid="nvme_mon", gid="nvme_mon")
+                shutil.chown(LOG_JSON, user="nvme_mon", group="nvme_mon")
                 os.chmod(LOG_JSON, 0o766)
                 log.info(f"Wrote {count} old records to archive.")
             except PermissionError:
@@ -281,6 +290,9 @@ def prune_log_file():
 
 if __name__ == "__main__":
     log.debug("Starting NVMe Monitor...")
+    log.debug(f"Collection interval: {COLLECTION_INTERVAL} seconds")
+    log.debug(f"Archive interval: {ARCHIVE_INTERVAL_SEC} seconds")
+    log.debug(f"Max record age: {MAX_RECORD_AGE}")
     repeat_function(ARCHIVE_INTERVAL_SEC, prune_log_file)
     monitor()
 
