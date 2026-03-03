@@ -36,7 +36,7 @@ log_level = LOG_LEVELS[os.environ.get("LOG_LEVEL", "warning").lower()]
 log = logging.getLogger(__name__)
 log.setLevel(log_level)
 
-REFRESH_INTERVAL_SEC = 300
+REFRESH_INTERVAL_SEC = 30
 
 CONFIG_FILE_NAME = 'config.yaml'
 
@@ -127,6 +127,7 @@ class NvmeMon:
     global CURRENT_SORT_KEY_IDX
     global SORT_KEYS
     def __init__(self, headless=True, config_file=None):
+        self.devices = None
         self.config_file = config_file
         self.infos = []
         self.last_sample_time = defaultdict(lambda: None)
@@ -163,7 +164,7 @@ class NvmeMon:
             self.display_info()
 
     def parse_log_file(self):
-        self.devices = defaultdict(device_record)
+        self.devices = defaultdict(device_record) if self.devices is None else self.devices
         self.temp_records = defaultdict(list)
         log_record_found = False
         with open(self.log_file, 'r') as f:
@@ -228,7 +229,6 @@ class NvmeMon:
         with open(config_file, 'r') as f:
             configs = yaml.safe_load(f)
             return configs 
-
     
     def get_devices(self):
         for _, device in cycle(self.devices.items()):
@@ -280,7 +280,6 @@ class NvmeMon:
             if current_device is not None and device != current_device:
                 continue
             current_device = None
-
             temp_info = device["temp_info"]
 
             data = {
@@ -325,6 +324,7 @@ class NvmeMon:
                 render_styled_text("EMail alerts are enabled, but one or more of the required environment variables is not set", "bold red")
             
             # Blocks until key is pressed or interval elapses
+            self.parse_log_file()
             key = getkey(REFRESH_INTERVAL_SEC)
             if key is None:
                 if self.alerts_enabled:
@@ -364,7 +364,6 @@ class NvmeMon:
                 sys.exit(0)
             else:
                 current_device = device
-            self.parse_log_file()
 
 def main():
     log.debug("argv = %r", sys.argv)
