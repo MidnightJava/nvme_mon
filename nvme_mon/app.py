@@ -154,7 +154,7 @@ class NvmeMon:
             render_styled_text(f"The specified NVME health data log file {self.log_file} does not exist. Exiting...", "bold red")
             sys.exit(0)
 
-        self.parse_log_file(initial_call=True)
+        self.parse_log_file()
         if headless: # headless mode
             if not self.email_settings_ok():
                 log.error("EMail alerts are enabled, but one or more of the required environment variables is not set")
@@ -163,17 +163,21 @@ class NvmeMon:
         else: # interactive mode
             self.display_info()
 
-    def parse_log_file(self, initial_call=False):
+    def parse_log_file(self):
         self.devices = defaultdict(device_record) if self.devices is None else self.devices
         self.temp_records = defaultdict(list)
         log_record_found = False
+        # Mutate self.devices items rather than re-assigning them, because the cycle generator in display_info
+        # retains the original self.devices references
+        for device in self.devices:
+            self.devices[device]['histogram'] = defaultdict(histo_record)
         with open(self.log_file, 'r') as f:
             for line in f:
                 log_record_found = True
                 record = json.loads(line)
                 device = record["device"]
                 histo_entry = self.devices[device]["histogram"][record["mean_temperature"]]
-                if initial_call: histo_entry["count"] += 1
+                histo_entry["count"] += 1
                 histo_entry["last_date"] = max(datetime.strptime(record["timestamp"], DATE_FORMAT), histo_entry["last_date"])
                 self.temp_records[device].append(Record(record["timestamp"], record["mean_temperature"]))
                 if self.last_sample_time[device] is not None:
@@ -229,10 +233,6 @@ class NvmeMon:
         with open(config_file, 'r') as f:
             configs = yaml.safe_load(f)
             return configs 
-    
-    def get_devices(self):
-        for _, device in cycle(self.devices.items()):
-            yield device
             
     def run_alert_loop(self):
         log.debug('Running alert loop')
@@ -275,7 +275,7 @@ class NvmeMon:
 
     def display_info(self):
         current_device = None
-        for device in self.get_devices():
+        for device in cycle(self.devices.values()):
             clear_screen()
             if current_device is not None and device != current_device:
                 continue
