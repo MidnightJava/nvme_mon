@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e#
+set -e
 # Run this script in a python virtual environment
 
 ############################################################################

@@ -37,6 +37,7 @@ log = logging.getLogger(__name__)
 log.setLevel(log_level)
 
 REFRESH_INTERVAL_SEC = 30
+HEADLESS_REFRESH_INTERVAL_SEC = 300
 
 CONFIG_FILE_NAME = 'config.yaml'
 
@@ -241,7 +242,7 @@ class NvmeMon:
             for device in self.devices.values():
                 self.check_alerts(device)
             self.check_log_data()
-            time.sleep(REFRESH_INTERVAL_SEC)
+            time.sleep(HEADLESS_REFRESH_INTERVAL_SEC)
 
     def check_log_data(self):
         settings = self.get_config()['alert_settings']
@@ -290,7 +291,7 @@ class NvmeMon:
 
             health_info = device["health_info"]
             data = health_info
-            print_disk_info(data, box=True, title="Disk Health Info")
+            print_disk_info(data, box=True, title="Disk Health")
 
             data = {
                 "Min temp": temp_info.min,
@@ -300,7 +301,7 @@ class NvmeMon:
                 "Median temp": temp_info.median,
                 "Sample interval (current/median)": f"{temp_info.current_sample_interval}/{temp_info.median_sample_interval} sec"
             }
-            print_disk_info(data, box=True, title="Summary Temperature Info (Based on average of all sensor readings)")
+            print_disk_info(data, box=True, title="Summary Temperature Info")
 
             histo = device["histogram"]
             histo = dict(sorted(histo.items(), key=self.SORT_KEYS[self.CURRENT_SORT_KEY_IDX]["value"], reverse=True))
